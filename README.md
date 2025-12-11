@@ -11,7 +11,7 @@ GeneParliamentID integrates species identifications inferred from individual gen
 The pipeline incorporates a sequence of several filters to increase the overall accuracy of identification by reducing noise introduced by low-confidence identifications, and is accompanied by a separate script for identifying the optimal filtering thresholds to facilitate implementation in any given dataset.
 
 ## Wiki
-Our Wiki contains detailed instructions on the following topics:
+Our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki) contains detailed instructions on the following topics:
 - Installation
 - GeneParliamentID pipeline
   - Pipeline parameters
@@ -56,7 +56,7 @@ You can run the GeneParliamentID pipeline like this:
 `-c` / `--confidence`:Optional calibration file providing confidence estimates depending on gene support. If omitted, no confidence estimate is added. [Example].  
 `-g` / `--grouping`: Optional file assigning species to species-groups. If omitted, no grouping information is implemented. [Example].  
 
-All files have specific formatting requirements. Please see the wiki for instructions and check the example files linked above.
+All files have specific formatting requirements. Please see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki) for instructions and check the example files linked above.
 
 ## Outputs
 The pipeline produces three outputs:
@@ -64,7 +64,7 @@ The pipeline produces three outputs:
 2) Gene Parliament graph visualisting proportion of genes for for each identification: `Sample1_gpid.pdf`  
 3) Top identification table detailing top identification and confidence in the calibration: `Sample1_topid.csv`
 
-For a detailed description of these outputs and their interpretation, please see the [wiki].  
+For a detailed description of these outputs and their interpretation, please see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
 
 ## Citation
