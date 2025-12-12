@@ -25,24 +25,6 @@ Our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki) contains detailed instru
   - Estimate confidence
 - Interpretation of the Gene Parliament
 
-## Setup
-### Clone GeneParliamentID repository
-Clone the GeneParliamentID repository from GitHub:  
-`git clone https://github.com/BenKuhnhaeuser/GPID.git`
-
-### Install dependencies
-We recommend installation of all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
-`conda create --name gpid`
-
-Activate conda environment:  
-`conda activate gpid`
-
-Install BLAST and R:  
-`conda install blast=2.17.0 r=4.5.0`  
-
-Install R packages:  
-`conda install r-optparse=1.7.5 r-dplyr=1.1.4 r-tidyr=1.3.1 r-strex=2.0.1 r-withr=3.0.2 r-ggplot2=4.0.0 r-rcolorbrewer=1.1_3 r-ggtext=0.1.2`
-
 
 ## Run GeneParliamentID pipeline
 You can run the GeneParliamentID pipeline like this:
