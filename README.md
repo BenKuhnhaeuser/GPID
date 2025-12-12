@@ -1,6 +1,7 @@
-# GeneParliamentID: A pipeline for multi-gene DNA barcoding [UNDER CONSTRUCTION]
+# GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding [UNDER CONSTRUCTION]
 
-**GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens Kew  
+
+**GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
 Current version: 1.0 (December 2025)
 
 ## Purpose
@@ -60,9 +61,9 @@ All files have specific formatting requirements. Please see the [wiki](https://g
 
 ## Outputs
 The pipeline produces three outputs:
-1) Gene Parliament table listing proportion of genes for for each identification: `Sample1_gpid.csv`  
-2) Gene Parliament graph visualisting proportion of genes for for each identification: `Sample1_gpid.pdf`  
-3) Top identification table detailing top identification and confidence in the calibration: `Sample1_topid.csv`
+1) Gene Parliament table listing proportion of genes for each identification: `<Sample1>_gpid.csv`  
+2) Gene Parliament graph visualisting proportion of genes for each identification: `<Sample1>_gpid.pdf`  
+3) Top identification, including confidence estimate: `<Sample1>_topid.csv`
 
 For a detailed description of these outputs and their interpretation, please see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
