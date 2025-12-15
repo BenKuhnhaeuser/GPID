@@ -31,11 +31,25 @@ Activate conda environment:
 
 Run GeneParliamentID pipeline:  
 `bash gpid.sh --sample <directory> --reference <directory> --performance <file> --thresholds <file> --confidence <file> [--grouping <file>]`
-  
+
 When you are done, deactivate the environment again using:  
-`conda deactivate`
+`conda deactivate`  
+
+### Pipeline inputs
+**Required arguments:**  
+Test sample and reference database:  
+`-s` / `--sample`: Directory containing multipe genes for a sample of unknown identity  
+`-r` / `--reference`: Directory with corresponding reference databases of each gene for lineage of interest  
+
+Calibration files to set pipeline parameters:  
+`-p` / `--performance`: Gene performance (percentage of correctly identified test samples for each gene)  
+`-t` / `--thresholds`: Filtering thresholds  
+`-c` / `--confidence`: Confidence estimates depending on gene support  
+
+**Optional argument:**  
+`-g` / `--grouping`: User-defined groups of closely related species  
   
-Please see the [Pipeline inputs](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-inputs) for detailed instructions on pipeline parameters and example files.
+All files have specific formatting requirements. Please see the [Pipeline inputs](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-inputs) for detailed instructions and example files.
 
 ## Outputs
 The pipeline produces three outputs:
