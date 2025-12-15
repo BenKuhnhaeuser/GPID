@@ -47,7 +47,7 @@ Calibration files to set pipeline parameters:
 `-c` / `--confidence`: Confidence estimates depending on gene support  
 
 **Optional argument:**  
-`-g` / `--grouping`: User-defined groups of closely related species  
+`-g` / `--groups`: User-defined groups of closely related species  
   
 All files have specific formatting requirements. Please see the [Pipeline inputs](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-inputs) for detailed instructions and example files.
 
