@@ -35,7 +35,7 @@ Run GeneParliamentID pipeline:
 When you are done, deactivate the environment again using:  
 `conda deactivate`  
 
-### Pipeline inputs
+## Pipeline inputs
 **Required arguments:**  
 Test sample and reference database:  
 `-s` / `--sample`: Directory containing multipe genes for a sample of unknown identity  
@@ -51,7 +51,7 @@ Calibration files to set pipeline parameters:
   
 All files have specific formatting requirements. Please see the [Pipeline inputs](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-inputs) for detailed instructions and example files.
 
-## Outputs
+## Pipeline outputs
 The pipeline produces three outputs:
 1) Gene Parliament table listing proportion of genes for each identification: `<Sample1>_gpid.csv`  
 2) Gene Parliament graph visualisting proportion of genes for each identification: `<Sample1>_gpid.pdf`  
