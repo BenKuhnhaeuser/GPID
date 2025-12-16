@@ -11,7 +11,17 @@ GeneParliamentID integrates species identifications inferred from individual gen
 
 The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.
 
-For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki). 
+## Wiki
+For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
+  
+The wiki covers the following topics:
+- [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview)
+- [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
+- [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
+- [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
+- [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation)
+- [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial)
+
 
 ## Quick start
 The fundamental commands for running GeneParliamentID are given here.  
