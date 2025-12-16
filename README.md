@@ -17,6 +17,7 @@ For a visual summary of the key pipeline steps, see [Pipeline overview](https://
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
   
 The wiki covers the following topics:
+- [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview)
 - [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
 - [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
 - [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
