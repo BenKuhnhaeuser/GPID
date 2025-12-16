@@ -14,6 +14,8 @@ The pipeline incorporates a sequence of several filtering steps to increase the 
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki). 
 
 ## Quick start
+The fundamental commands for running GeneParliamentID are given here. For a worked example using test data, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
+
 ### Installation
 Clone the repository:  
 `git clone https://github.com/BenKuhnhaeuser/GPID.git`  
@@ -59,16 +61,19 @@ Calibration files to set pipeline parameters:
 **Optional argument:**  
 `-g` / `--groups`: User-defined groups of closely related species  
   
-All files have specific formatting requirements. Please see the [Pipeline inputs](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-inputs) for detailed instructions and example files.
+See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters) for detailed instructions on the requirements for each argument.
 
 ## Pipeline outputs
-The pipeline produces three outputs:
-1) Gene Parliament table listing proportion of genes for each identification: `<Sample1>_gpid.csv`  
-2) Gene Parliament graph visualisting proportion of genes for each identification: `<Sample1>_gpid.pdf`  
-3) Top identification, including confidence estimate: `<Sample1>_topid.csv`
+The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
+  
+The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a figure `<Sample>_gpid.pdf`.
+  
+For a detailed description of these outputs and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
 
-For a detailed description of these outputs and their interpretation, please see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki#outputs).
+## Method calibration
+When running the GeneParliamentID pipeline for the first time for a new lineage, method calibration using a test dataset is required to identify the optimal pipeline parameters for this lineage. This is not necessary if optimal pipeline parameters have already been established for the lineage of interest. 
 
+For details, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
 
 ## Citation
 Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. (2025). **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** Under review.
