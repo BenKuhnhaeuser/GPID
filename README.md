@@ -14,7 +14,7 @@ The pipeline incorporates a sequence of several filtering steps to increase the 
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki). 
 
 ## Quick start
-The fundamental commands for running GeneParliamentID are given here. For a worked example using test data, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
+The fundamental commands for running GeneParliamentID are given here.  
 
 ### Installation
 Clone the repository:  
@@ -46,6 +46,8 @@ Run GeneParliamentID pipeline:
 
 When you are done, deactivate the environment again using:  
 `conda deactivate`  
+  
+For a worked example using test data, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
 
 ## Pipeline inputs
 **Required arguments:**  
