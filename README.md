@@ -25,12 +25,22 @@ Install dependencies in new [conda](https://www.anaconda.com/docs/getting-starte
 
 For more detailed instructions, see [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup/).
 
+### Export path to directory containing scripts  
+`export PATH=$PATH:</path/to/gpid/scripts>`  
+This allows to execute the scripts from any location.  
+  
+Notes:  
+- Change `</path/to/gpid/scripts>` to the actual path on your machine
+- This path will only be valid for the length of your session
+- Remember to omit the angle brackets, e.g. $PATH:/path/to/gpid/scripts
+- Do not include the script itself in the path
+
 ### Run pipeline
 Activate conda environment:  
 `conda activate gpid`  
 
 Run GeneParliamentID pipeline:  
-`bash gpid.sh --sample <directory> --reference <directory> --performance <file> --thresholds <file> --confidence <file> [--grouping <file>]`
+`bash gpid.sh --sample <directory> --reference <directory> --performance <file> --thresholds <file> --confidence <file> [--groups <file>]`
 
 When you are done, deactivate the environment again using:  
 `conda deactivate`  
@@ -61,4 +71,4 @@ For a detailed description of these outputs and their interpretation, please see
 
 
 ## Citation
-Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. (2025). **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** Submitted to Molecular Ecology Resources.
+Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. (2025). **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** Under review.
