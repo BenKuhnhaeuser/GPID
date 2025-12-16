@@ -9,13 +9,14 @@ GeneParliamentID (GPID) is a pipeline for sample identification using hundreds o
 
 GeneParliamentID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification, comparable to the established concept of gene tree discordance in phylogenomics.  
 
-The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.
+The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.  
+  
+For a visual summary of the key pipeline steps, see [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview).
 
 ## Wiki
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
   
 The wiki covers the following topics:
-- [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview)
 - [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
 - [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
 - [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
