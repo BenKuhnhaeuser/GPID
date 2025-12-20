@@ -20,8 +20,8 @@ The wiki covers the following topics:
 - [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview)
 - [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
 - [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
+- [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation)  
 - [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
-- [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation)
 - [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial)
 
 
