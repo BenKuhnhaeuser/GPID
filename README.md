@@ -58,8 +58,6 @@ Run GeneParliamentID pipeline:
 
 When you are done, deactivate the environment again using:  
 `conda deactivate`  
-  
-For a worked example using test data, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
 
 ## Pipeline inputs
 **Required arguments:**  
@@ -88,6 +86,17 @@ For a detailed description of these outputs and their interpretation, see [Inter
 When running the GeneParliamentID pipeline for the first time for a new lineage, method calibration using a test dataset is required to identify the optimal pipeline parameters for this lineage. This is not necessary if optimal pipeline parameters have already been established for the lineage of interest. 
 
 For details, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
+
+## Tutorial  
+We provide a worked example of the GeneParliamentID pipeline using test data and calibration files.  
+This allows you to quickly familiarise yourself with:  
+- input file requirements and formats
+- how to run the pipeline
+- the output files produced
+
+It might also provide a useful template for setting up your own analyses.
+
+To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
 
 ## Citation
 Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. (2025). **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** Under review.
