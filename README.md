@@ -61,8 +61,8 @@ When you are done, deactivate the environment again using:
 
 ## Pipeline inputs
 **Required arguments:**  
-Test sample and reference database:  
-`-i`: Directory containing multipe genes for a sample of unknown identity  
+Sample and reference datasets:  
+`-i`: Directory containing multiple genes for a sample of unknown identity  
 `-r`: Directory with corresponding reference databases of each gene for lineage of interest  
 
 Calibration files to set pipeline parameters:  
