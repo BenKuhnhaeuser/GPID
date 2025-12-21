@@ -83,7 +83,11 @@ The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a fi
 For a detailed description of these outputs and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
 
 ## Method calibration
-When running the GeneParliamentID pipeline for the first time for a new lineage, method calibration using a test dataset is required to identify the optimal pipeline parameters for this lineage. This is not necessary if optimal pipeline parameters have already been established for the lineage of interest. 
+When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage.  
+
+Method calibration is not necessary if optimal pipeline parameters have already been established for the lineage of interest.  
+
+It is also possible to run the pipeline without conducting method calibration by providing "dummy" calibration files. This will most likely result in considerably reduced accuracy of identification but may be justified e.g. for a first explorative analysis or if a test dataset is not available.
 
 For details, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
 
