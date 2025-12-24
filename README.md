@@ -39,6 +39,12 @@ Install dependencies in new [conda](https://www.anaconda.com/docs/getting-starte
 
 For more detailed instructions, see [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup/).
 
+### Make scripts executable
+First, navigate to the scripts folder.  
+In the scripts folder, make the command line scripts executable using `chmod +x`:  
+
+`chmod +x gpid parliament.R`
+
 ### Export path to directory containing scripts  
 `export PATH=$PATH:</path/to/gpid/scripts>`  
 This allows to execute the scripts from any location.  
