@@ -84,7 +84,7 @@ See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-p
 ## Pipeline outputs
 The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
   
-The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a figure `<Sample>_gpid.pdf`.
+The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a figure in different formats `<Sample>_gpid.jpg`, `<Sample>_gpid.pdf` and `<Sample>_gpid.svg`.
   
 For a detailed description of these outputs and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
 
