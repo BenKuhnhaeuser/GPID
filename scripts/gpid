@@ -1,0 +1,246 @@
+#!/bin/bash
+
+#################################################################
+# GeneParliamentID pipeline					#
+# Benedikt Kuhnhaeuser						#
+# Royal Botanic Gardens, Kew					#
+# 2025								#
+#################################################################
+
+# Halt script on error
+set -euo pipefail
+
+#----------------------------------------
+# Command-line arguments and file checks
+#----------------------------------------
+
+# Initialize variables for input and output files
+sample_dir=""
+reference_dir=""
+gene_performance_file=""
+thresholds_file=""
+confidence_support_file=""
+species_groups_file=""
+
+# Show usage and exit if no arguments were provided at all
+if [ "$#" -eq 0 ]; then
+    echo "Usage: gpid -i <sample directory> -r <reference directory> -g <gene performance file> -t <thresholds file> -c <confidence support file> [-s <species groups file>]"
+    exit 1
+fi
+
+# Parse command-line arguments
+while getopts "i:r:g:t:c:s:" opt; do
+    case $opt in
+	i) sample_dir="$OPTARG" ;;
+	r) reference_dir="$OPTARG" ;;
+        g) gene_performance_file="$OPTARG" ;;
+        t) thresholds_file="$OPTARG" ;;
+        c) confidence_support_file="$OPTARG" ;;
+	s) species_groups_file="$OPTARG" ;;
+	*) echo "Usage: $0 -i <sample directory> -r <reference directory> -g <gene performance file> -t <thresholds file> -c <confidence support file> [-s <species groups file>]"
+           exit 1  ;;
+    esac
+done
+
+# Check whether all required flags were provided
+missing=0
+
+if [ -z "$sample_dir" ]; then
+    echo "Error: -i <sample directory> is required."
+    missing=1
+fi
+
+if [ -z "$reference_dir" ]; then
+    echo "Error: -r <reference directory> is required."
+    missing=1
+fi
+
+if [ -z "$gene_performance_file" ]; then
+    echo "Error: -g <gene performance file> is required."
+    missing=1
+fi
+
+if [ -z "$thresholds_file" ]; then
+    echo "Error: -t <thresholds file> is required."
+    missing=1
+fi
+
+if [ -z "$confidence_support_file" ]; then
+    echo "Error: -c <confidence support file> is required."
+    missing=1
+fi
+
+if [ $missing -eq 1 ]; then
+    echo "Usage: $0 -i <sample directory> -r <reference directory> -g <gene performance file> -t <thresholds file> -c <confidence support file> [-s <species groups file>]"
+    exit 1
+fi
+
+# Check whether required files exist
+notfound=0
+
+if [ ! -d "$sample_dir" ]; then
+    echo "Error: Sample directory not found: $sample_dir"
+    notfound=1
+fi
+
+if [ ! -d "$reference_dir" ]; then
+    echo "Error: Reference directory not found: $reference_dir"
+    notfound=1
+fi
+
+if [ ! -f "$gene_performance_file" ]; then
+    echo "Error: Gene performance file not found: $gene_performance_file"
+    notfound=1
+fi
+
+if [ ! -f "$thresholds_file" ]; then
+    echo "Error: Thresholds file not found: $thresholds_file"
+    notfound=1
+fi
+
+if [ ! -f "$confidence_support_file" ]; then
+    echo "Error: Confidence support file not found: $confidence_support_file"
+    notfound=1
+fi
+
+if [ $notfound -eq 1 ]; then
+    exit 1
+fi
+
+# Check optional file only if the user provided it
+if [ -n "$species_groups_file" ] && [ ! -f "$species_groups_file" ]; then
+    echo "Error: Species groups file not found for optional flag -s: $species_groups_file"
+    notfound=1
+fi
+
+if [ $notfound -eq 1 ]; then
+    exit 1
+fi
+
+# Remove potential trailing slashes in directory paths
+sample_dir=${sample_dir%/}
+reference_dir=${reference_dir%/}
+
+# Get sample name from sample directory path
+sample=$(basename $sample_dir)
+
+# Summarise file checks
+echo "All required directories and files located:"
+echo "  -i <sample directory>: $sample_dir"
+echo "  -r <reference directory>: $reference_dir"
+echo "  -g <gene performance file>: $gene_performance_file"
+echo "  -t <thresholds file>: $thresholds_file"
+echo "  -c <confidence support file>: $confidence_support_file"
+if [ -n "$species_groups_file" ]; then
+    echo "Optional file located:"
+    echo "  -s <species groups file>: $species_groups_file"
+else
+    echo "No -s <species groups> file provided (optional)"
+fi
+echo ""
+
+#---------------------------------
+# Pairwise alignment of all genes
+#---------------------------------
+
+# Prepare gene list
+#-------------------
+echo "Creating list of high-performance genes for sample directory..."
+
+# Get list of high-performance genes
+## Get gene performance filtering threshold from thresholds file
+gene_performance_threshold=$(awk -F',' 'NR==1{for(i=1;i<=NF;i++)if($i~/performance/)c=i} NR==2{print $c}' $thresholds_file)
+
+## Get list of high-performance genes 
+genelist_high_performance=$(
+  awk -F',' -v threshold="$gene_performance_threshold" '
+    NR > 1 && $2 >= threshold { print $1 }
+  ' "$gene_performance_file"
+)
+
+
+# Get list of genes in the sample directory
+genelist_sample=$(
+  for f in "$sample_dir"/*.FNA; do
+    basename "${f%.FNA}"
+  done
+)
+
+# Genes occurring in both lists
+comm -12 \
+  <(printf "%s\n" "$genelist_high_performance" | sort -u) \
+  <(printf "%s\n" "$genelist_sample" | sort -u) \
+  > "$sample_dir"/genelist_high_performance.txt
+
+# Terminate if genelist_high_performance.txt file is empty
+if [[ ! -s "${sample_dir}/genelist_high_performance.txt" ]]; then
+    echo "WARNING: No gene passed gene performance threshold" >&2
+
+    cat > "${sample}_gpid.csv" <<EOF
+Sample,Rank,Identification,Species_group,Support_pct,Support,Parliament_size,Data_checks,ID_correct_pct,ID_close_pct,ID_wrong_pct
+${sample},NA,NA,NA,NA,NA,0,FAILED_1,,,
+EOF
+    echo "Minimal gene parliament table written:"
+    echo "${sample}_gpid.csv"
+    echo "No gene parliament figure produced."
+    echo "Terminating."
+    exit 1
+fi
+
+# Otherwise, confirm output written
+echo "Done."
+echo "Gene list written to sample directory:"
+echo "${sample_dir}/genelist_high_performance.txt"
+echo ""
+
+# Search each gene against respective BLAST reference database and retrieve best match
+#--------------------------------------------------------------------------------------
+
+echo "Matching genes against reference databases..."
+
+# Run BLAST and save to file
+for gene in $(cat "$sample_dir"/genelist_high_performance.txt); do
+
+        # Match query samples against blast database
+        blastn -query "$sample_dir"/"$gene".FNA -db "$reference_dir"/"$gene".FNA -task megablast -outfmt "6 qseqid sseqid pident length mismatch gapopen evalue bitscore" -max_target_seqs 1000000 |
+
+        # Sort by bit score (k8,8), descending and numerical (rn), shuffing identical reference queries (k2,2R)
+        sort -t $'\t' -k8,8rn -k2,2R |
+
+        # Get top match with highest bit score, which is the first row
+        head -1 |
+
+        # Add gene name as the first column and save file
+        awk -v genename="$gene" '{print genename "\t" $0}'; done > "$sample"_blast.tsv
+
+
+# Add header row to results
+sed -i '1i gene\tquery\ttarget\tpident\tlength\tmismatch\tgapopen\tevalue\tbitscore' "$sample"_blast.tsv
+
+echo "Done."
+echo "BLAST file with top matches written:"
+echo "${sample}_blast.tsv"
+echo ""
+
+# Save blast results into variable
+#----------------------------------
+blast_file="${sample}_blast.tsv"
+
+
+#-------------------------
+# Run parliament.r script
+#-------------------------
+
+echo "Computing Gene Parliament..."
+
+parliament.R $sample_dir $blast_file $gene_performance_file $thresholds_file $confidence_support_file $species_groups_file
+
+echo "Done."
+echo "Gene Parliament table written:"
+echo "${sample}_gpid.csv"
+echo "Gene Parliament figure in different formats created:"
+echo "${sample}_gpid.jpg"
+echo "${sample}_gpid.pdf"
+echo "${sample}_gpid.svg"
+echo ""
+echo "Analyses complete."
