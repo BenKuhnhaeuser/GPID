@@ -1,0 +1,2 @@
+min_similarity,min_length,max_gapopens,max_mismatches,max_evalue,min_bitscore,min_gene_performance,min_parliament_size
+98,100,1,5,1e-60,200,30,10
