@@ -11,8 +11,6 @@ GeneParliamentID integrates species identifications inferred from individual gen
 
 The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.  
   
-For a visual summary of the key pipeline steps, see [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview).
-
 ## Wiki
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
   
@@ -24,7 +22,17 @@ The wiki covers the following topics:
 - [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
 - [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial)
 
-
+## Pipeline summary
+The key steps of the GeneParliamentID pipeline are:
+1. Select genes with performance of species identification above user-defined threshold
+2. **Align each gene** against reference, select top match based on highest Bit-score
+3. Remove low-confidence matches that don't meet the user-defined alignment filtering thresholds
+4. Summarise the number of genes supporting each identification to the **Gene Parliament**
+5. Flag the sample as data-deficient if the number of genes (parliament size) is below the user-defined threshold
+6. Select identification with most support as the **top identification**
+7. Evaluate confidence in the top identification based on the percentage of genes supporting this identification  
+<img width="800" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/57cf5a9f-b1e0-46da-85ba-d020ff2c93a6" />  
+  
 ## Quick start
 The fundamental commands for running GeneParliamentID are given here.  
 
