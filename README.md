@@ -15,7 +15,6 @@ The pipeline incorporates a sequence of several filtering steps to increase the 
 For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
   
 The wiki covers the following topics:
-- [Pipeline overview](https://github.com/BenKuhnhaeuser/GPID/wiki#pipeline-overview)
 - [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
 - [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
 - [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation)  
