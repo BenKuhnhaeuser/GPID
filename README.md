@@ -1,4 +1,4 @@
-# GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding<br>[UNDER CONSTRUCTION]
+# GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding<br>[UNDER REVIEW]
 
 
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
@@ -7,7 +7,7 @@ Current version: 1.0 (December 2025)
 ## Overview
 GeneParliamentID (GPID) is a pipeline for sample identification using hundreds or thousands of genes, such as those generated using targeted sequence capture.  
 
-GeneParliamentID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification, comparable to the established concept of gene tree discordance in phylogenomics.  
+GeneParliamentID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification, comparable to the gene tree discordance in phylogenomics.  
 
 The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.  
   
@@ -28,6 +28,9 @@ The wiki covers the following topics:
 ## Quick start
 The fundamental commands for running GeneParliamentID are given here.  
 
+### Operating system
+GeneParliamentID is a command-line tool written for Unix operating systems such as Linux.  
+
 ### Installation
 Clone the repository:  
 `git clone https://github.com/BenKuhnhaeuser/GPID.git`  
@@ -46,14 +49,12 @@ In the scripts folder, make the command line scripts executable using `chmod +x`
 `chmod +x gpid parliament.R`
 
 ### Export path to directory containing scripts  
-`export PATH=$PATH:</path/to/gpid/scripts>`  
+`export PATH=$PATH:/path/to/gpid/scripts`  
 This allows to execute the scripts from any location.  
   
 Notes:  
-- Change `</path/to/gpid/scripts>` to the actual path on your machine
-- This path will only be valid for the length of your session
-- Remember to omit the angle brackets, e.g. $PATH:/path/to/gpid/scripts
-- Do not include the script itself in the path
+- Change `/path/to/gpid/scripts` to the actual path to the gpid scripts directory on your machine  
+- This path will only be valid for the length of your session  
 
 ### Run pipeline
 Activate conda environment:  
@@ -85,15 +86,16 @@ See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-p
 The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
   
 The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a figure in different formats `<Sample>_gpid.jpg`, `<Sample>_gpid.pdf` and `<Sample>_gpid.svg`.
+
+Example Gene Parliament figure:  
+<img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
   
-For a detailed description of these outputs and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
+For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
 
 ## Method calibration
-When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage.  
-
-Method calibration is not necessary if optimal pipeline parameters have already been established for the lineage of interest.  
-
-It is also possible to run the pipeline without conducting method calibration by providing "dummy" calibration files. This will most likely result in considerably reduced accuracy of identification but may be justified e.g. for a first explorative analysis or if a test dataset is not available.
+When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification.  
+  
+It is also possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration#bypassing-method-calibration) by providing "dummy" calibration files. This will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters but may be justified e.g. for a first explorative analysis or if a test dataset is not available.
 
 For details, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
 
