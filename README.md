@@ -30,7 +30,7 @@ The key steps of the GeneParliamentID pipeline are:
 5. Flag the sample as data-deficient if the number of genes (parliament size) is below the user-defined threshold
 6. Select identification with most support as the **top identification**
 7. Evaluate confidence in the top identification based on the percentage of genes supporting this identification  
-<img width="800" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/57cf5a9f-b1e0-46da-85ba-d020ff2c93a6" />  
+<img width="500" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/57cf5a9f-b1e0-46da-85ba-d020ff2c93a6" />  
   
 ## Quick start
 The fundamental commands for running GeneParliamentID are given here.  
