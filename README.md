@@ -1,4 +1,4 @@
-# GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding<br>[UNDER REVIEW]
+# GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding
 
 
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
