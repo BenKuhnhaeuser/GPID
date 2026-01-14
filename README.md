@@ -118,4 +118,4 @@ It might also provide a useful template for setting up your own analyses.
 To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
 
 ## Citation
-Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. (in review). **GeneParliamentID: A pipeline for multi-gene DNA barcoding.**
+Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** (In review)
