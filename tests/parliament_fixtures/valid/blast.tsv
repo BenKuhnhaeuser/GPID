@@ -1,0 +1,3 @@
+gene	query	target	pident	length	mismatch	gapopen	evalue	bitscore
+Gene1	Sample_valid	Acacia_testii_REF1	99.5	120	0	0	0	300
+Gene2	Sample_valid	Acacia_testii_REF1	99.1	118	0	0	0	295

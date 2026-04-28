@@ -1,0 +1,10 @@
+calibration/
+validation/
+identifications/
+example_data/
+tests/
+scripts/archive/
+*.pdf
+*.rds
+*.tsv
+*.log

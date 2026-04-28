@@ -1,0 +1,9 @@
+.Rhistory
+.RData
+.Rproj.user/
+calibration/
+validation/
+identifications/
+*.log
+*.tmp
+*.bak
