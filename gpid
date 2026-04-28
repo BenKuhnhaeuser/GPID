@@ -1,0 +1,62 @@
+#!/bin/bash
+
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+VERSION_FILE="${GPID_VERSION_FILE:-$SCRIPT_DIR/VERSION}"
+if [ -z "${GPID_VERSION:-}" ] && [ -f "$VERSION_FILE" ]; then
+    IFS= read -r GPID_VERSION < "$VERSION_FILE" || GPID_VERSION=""
+    GPID_VERSION=${GPID_VERSION%$'\r'}
+fi
+GPID_VERSION="${GPID_VERSION:-unknown}"
+
+usage() {
+    printf 'GPID version: %s\n\n' "$GPID_VERSION"
+    cat <<'EOF'
+Usage: gpid <command> [arguments]
+
+Commands:
+  reference       Prepare a GPID reference directory
+  calibrate       Run the GPID calibration workflow
+  validate        Run validation analyses on samples with known identity
+  identify        Run the GPID identification workflow
+  help            Show this help message
+
+Examples:
+  gpid reference -r reference
+  gpid calibrate prepare -r reference -i calibration_samples
+  gpid validate prepare -r reference -i validation_samples
+  gpid identify -i samples/my_sample -r reference -g calibration/calibration_gene_performance.csv -t calibration/calibration_filtering_thresholds.csv -c validation/validation_confidence_support.csv
+EOF
+}
+
+if [ "$#" -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+command_name="$1"
+shift
+
+case "$command_name" in
+    reference)
+        exec bash "$SCRIPT_DIR/scripts/reference.sh" "$@"
+        ;;
+    calibrate)
+        exec bash "$SCRIPT_DIR/scripts/calibrate.sh" "$@"
+        ;;
+    validate)
+        exec bash "$SCRIPT_DIR/scripts/validate.sh" "$@"
+        ;;
+    identify)
+        exec bash "$SCRIPT_DIR/scripts/identify.sh" "$@"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        printf 'Error: Unknown GPID command: %s\n' "$command_name" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
