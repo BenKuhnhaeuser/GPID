@@ -4,6 +4,8 @@
 calibration/
 validation/
 identifications/
+tests/
+conda-recipe/
 *.log
 *.tmp
 *.bak
