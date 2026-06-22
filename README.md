@@ -2,7 +2,7 @@
 
 
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
-Current version: 1.0.0 (January 2026)
+Current version: 1.1.2 (June 2026)
 
 ## Overview
 GeneParliamentID (GPID) is a pipeline for sample identification using hundreds or thousands of genes, such as those generated using targeted sequence capture.  
@@ -32,62 +32,84 @@ The key steps of the GeneParliamentID pipeline are:
 7. Evaluate confidence in the top identification based on the percentage of genes supporting this identification  
 <img width="600" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/57cf5a9f-b1e0-46da-85ba-d020ff2c93a6" />  
   
-## Quick start
-The fundamental commands for running GeneParliamentID are given here.  
+
+## Setup
 
 ### Operating system
 GeneParliamentID is a command-line tool written for Unix operating systems such as Linux.  
 
-### Installation
-Clone the repository:  
-`git clone https://github.com/BenKuhnhaeuser/GPID.git`  
+### System requirements
+The system requirements for running GPID depend on the size of the reference dataset and the number of genes analysed. For the datasets with which GPID was tested for the publication, they were:  
+- Rattans: XXXGB RAM, XXX CPU cores
+- Mahoganies: XXXGB RAM, XXX CPU cores 
 
-Install dependencies in new [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) environment:  
-`conda create --name gpid`  
-`conda activate gpid`  
-`conda install blast=2.17.0 r=4.5.0 r-optparse=1.7.5 r-dplyr=1.1.4 r-tidyr=1.3.1 r-strex=2.0.1 r-withr=3.0.2 r-ggplot2=4.0.0 r-rcolorbrewer=1.1_3 r-ggtext=0.1.2`  
+### Install GPID
+We recommend installation of GPID including all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
+`conda create --name gpid gpid`
 
-For more detailed instructions, see [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup/).
+### Activate GPID environment
+To activate the GPID conda environment, use:  
+`conda activate gpid`
 
-### Make scripts executable
-First, navigate to the scripts folder.  
-In the scripts folder, make the command line scripts executable using `chmod +x`:  
+### Confirm successful installation
+To confirm that the installation has worked and show a help message on how to use GPID, simply run:  
+`gpid`  
 
-`chmod +x gpid parliament.R`
+## Quick start
+The fundamental commands for running GeneParliamentID are given here. For detailed instructions, see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
-### Export path to directory containing scripts  
-`export PATH=$PATH:/path/to/gpid/scripts`  
-This allows to execute the scripts from any location.  
+GPID is structured into four commands:  
+1. `gpid reference`: Prepare a reference directory  
+2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings.  
+3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification
+4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings  
+
+Note: Steps 1-3 only need to be conducted a single time. Once they have been completed, only step 4 needs to be run for sample identification.
+
+### 1. Reference construction
+Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/Reference) directory with BLAST databases for all genes in the directory. There is one single command:  
+`gpid reference -r <reference directory>`
+
+### 2. Method calibration
+When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification. This involves multiple steps that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration). The base command is:  
+`gpid calibrate`  
+
+Method calibration is structured into five subcommands:  
+`gpid calibrate prepare`: Prepare input files for calibration by matching each test sample against the reference dataset  
+`gpid calibrate alignments`: Identify optimal alignment filtering thresholds  
+`gpid calibrate genes`: Estimate gene performance and identify optimal gene threshold  
+`gpid calibrate parliament`: Identify optimal minimum parliament size threshold  
+`gpid calibrate combine`: Combine manually selected thresholds in a calibration file for subsequent use  
   
-Notes:  
-- Change `/path/to/gpid/scripts` to the actual path to the gpid scripts directory on your machine  
-- This path will only be valid for the length of your session  
+Note: It is possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration#bypassing-method-calibration). This is *not* recommended as it will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters. However, it may be justified e.g. for a first explorative analysis or if a test dataset for calibration is not available.
 
-### Run pipeline
-Activate conda environment:  
-`conda activate gpid`  
+### 3. Method validation
+This allows to assess the accuracy of identification using test samples of known identity. Method validation consists of three subcommands that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-validation). The base command is:  
+`gpid validate`  
 
-Run GeneParliamentID pipeline:  
-`gpid -i <sample directory> -r <reference directory> -g <gene performance file> -t <thresholds file> -c <confidence support file> [-s <species groups file>]`
+Method validation is structured into three subcommands:  
+`gpid validate prepare`: Prepare input files for calibration by matching each test sample against the reference dataset  
+`gpid validate confidence`: Estimate validation confidence for different numbers of support bins  
+`gpid validate bins`: Save validation confidence support probabilities for selected number of bins  
 
-When you are done, deactivate the environment again using:  
-`conda deactivate`  
+### 4. Sample identification
+Once the reference has been constructed and method calibration and validation are completed, you can conduct sample identification without the need to repeat the above steps. Sample identification is conducted using a single command that takes the outputs prepared using `gpid reference`, `gpid calibrate` and `gpid validate` as inputs. There is a single command with multiple flags:  
+`gpid identify -i <sample directory> -r <reference directory> [-g <gene performance file> -t <thresholds file> -c <confidence support file>] [-s <species groups file>]`  
 
-## Pipeline inputs
-**Required arguments:**  
-Sample and reference datasets:  
-`-i`: Directory containing multiple genes for a sample of unknown identity  
-`-r`: Directory with corresponding reference databases of each gene for lineage of interest  
+The required input arguments are:  
+`-i`: Sample directory containing one FASTA file per gene for the sample to identify  
+`-r`:  Reference directory containing one FASTA file per gene and the corresponding BLAST databases  
 
-Calibration files to set pipeline parameters:  
-`-g`: Gene performance of each gene (percentage of correctly identified test samples)  
-`-t`: Filtering thresholds  
-`-c`: Confidence estimates depending on gene support  
+For method calibration and validation, the standard file names and locations produced in steps 2-3 are used by default. This can be specified using:  
+`-g`: Gene performance file  
+`-t`: Filtering thresholds file  
+`-c`: Confidence estimates file  
 
-**Optional argument:**  
-`-s`: User-defined groups of closely related species  
-  
-See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters) for detailed instructions on the requirements for each argument.
+Optionally, manually defined groups of closely related species can be included in the results:  
+`-s`: Species groups file
+ 
+See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters) for a full list of arguments and detailed instructions on the requirements for each argument.
+
 
 ## Pipeline outputs
 The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
@@ -99,12 +121,6 @@ Example Gene Parliament figure:
   
 For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
 
-## Method calibration
-When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification.  
-  
-It is also possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration#bypassing-method-calibration) by providing "dummy" calibration files. This will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters but may be justified e.g. for a first explorative analysis or if a test dataset is not available.
-
-For details, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
 
 ## Tutorial  
 We provide a worked example of the GeneParliamentID pipeline using test data and calibration files.  
