@@ -7,19 +7,15 @@ Current version: 1.1.2 (June 2026)
 ## Overview
 GeneParliamentID (GPID) is a pipeline for sample identification using hundreds or thousands of genes, such as those generated using targeted sequence capture.  
 
-GeneParliamentID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification, comparable to the gene tree discordance in phylogenomics.  
+GPID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification. Besides sample identification, the pipeline includes reference directory preparation, method calibration and method validation.    
 
-The pipeline incorporates a sequence of several filtering steps to increase the accuracy of identification. It is accompanied by a calibration script that allows identifying the optimal filtering thresholds in any given dataset.  
+The pipeline is structured into four commands:  
+1. `gpid reference`: Prepare a reference directory  
+2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings  
+3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification
+4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings  
   
-## Wiki
-For detailed instructions on how to use, calibrate and interpret GeneParliamentID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
-  
-The wiki covers the following topics:
-- [Setup](https://github.com/BenKuhnhaeuser/GPID/wiki/Setup)
-- [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters)
-- [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation)  
-- [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration)
-- [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial)
+For detailed instructions on how to use and interpret GPID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
 ## Pipeline summary
 The key steps of the GeneParliamentID pipeline are:
@@ -58,16 +54,8 @@ To confirm that the installation has worked and show a help message on how to us
 ## Quick start
 The fundamental commands for running GeneParliamentID are given here. For detailed instructions, see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
-GPID is structured into four commands:  
-1. `gpid reference`: Prepare a reference directory  
-2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings.  
-3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification
-4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings  
-
-Note: Steps 1-3 only need to be conducted a single time. Once they have been completed, only step 4 needs to be run for sample identification.
-
 ### 1. Reference construction
-Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/Reference) directory with BLAST databases for all genes in the directory. There is one single command:  
+Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/Reference-construction) directory with BLAST databases for all genes in the directory. There is one single command:  
 `gpid reference -r <reference directory>`
 
 ### 2. Method calibration
@@ -108,13 +96,13 @@ For method calibration and validation, the standard file names and locations pro
 Optionally, manually defined groups of closely related species can be included in the results:  
 `-s`: Species groups file
  
-See [Pipeline parameters](https://github.com/BenKuhnhaeuser/GPID/wiki/Pipeline-parameters) for a full list of arguments and detailed instructions on the requirements for each argument.
+See [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
 
 
 ## Pipeline outputs
 The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
   
-The Gene Parliament is presented both as a table `<Sample>_gpid.csv` and as a figure in different formats `<Sample>_gpid.jpg`, `<Sample>_gpid.pdf` and `<Sample>_gpid.svg`.
+The Gene Parliament is presented both as a table and as a figure.
 
 Example Gene Parliament figure:  
 <img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
