@@ -55,11 +55,11 @@ To confirm that the installation has worked and show a help message on how to us
 The fundamental commands for running GeneParliamentID are given here. For detailed instructions, see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
 
 ### 1. Reference construction
-Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/Reference-construction) directory with BLAST databases for all genes in the directory. There is one single command:  
+Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction) directory with BLAST databases for all genes in the directory. There is one single command:  
 `gpid reference -r <reference directory>`
 
 ### 2. Method calibration
-When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification. This involves multiple steps that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration). The base command is:  
+When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification. This involves multiple steps that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration). The base command is:  
 `gpid calibrate`  
 
 Method calibration is structured into five subcommands:  
@@ -69,10 +69,10 @@ Method calibration is structured into five subcommands:
 `gpid calibrate parliament`: Identify optimal minimum parliament size threshold  
 `gpid calibrate combine`: Combine manually selected thresholds in a calibration file for subsequent use  
   
-Note: It is possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration#bypassing-method-calibration). This is *not* recommended as it will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters. However, it may be justified e.g. for a first explorative analysis or if a test dataset for calibration is not available.
+Note: It is possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration#bypassing-method-calibration). This is *not* recommended as it will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters. However, it may be justified e.g. for a first explorative analysis or if a test dataset for calibration is not available.
 
 ### 3. Method validation
-This allows to assess the accuracy of identification using test samples of known identity. Method validation consists of three subcommands that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-validation). The base command is:  
+This allows to assess the accuracy of identification using test samples of known identity. Method validation consists of three subcommands that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation). The base command is:  
 `gpid validate`  
 
 Method validation is structured into three subcommands:  
@@ -96,7 +96,7 @@ For method calibration and validation, the standard file names and locations pro
 Optionally, manually defined groups of closely related species can be included in the results:  
 `-s`: Species groups file
  
-See [here](https://github.com/BenKuhnhaeuser/GPID/wiki/Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
+See [here](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
 
 
 ## Pipeline outputs
@@ -107,7 +107,7 @@ The Gene Parliament is presented both as a table and as a figure.
 Example Gene Parliament figure:  
 <img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
   
-For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/Interpretation).
+For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation).
 
 
 ## Tutorial  
@@ -119,7 +119,7 @@ This allows you to quickly familiarise yourself with:
 
 It might also provide a useful template for setting up your own analyses.
 
-To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/Tutorial).
+To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
 
 ## Citation
 Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** (In review)
