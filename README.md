@@ -9,13 +9,22 @@ GeneParliamentID (GPID) is a pipeline for sample identification using hundreds o
 
 GPID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification. Besides sample identification, the pipeline includes reference directory preparation, method calibration and method validation.    
 
-The pipeline is structured into four commands:  
+The pipeline is structured into four main commands:  
 1. `gpid reference`: Prepare a reference directory  
 2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings  
 3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification
 4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings  
-  
-For detailed instructions on how to use and interpret GPID, please visit our [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
+
+## Wiki
+For detailed instructions on how to use and interpret GPID, please visit the [Wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
+
+The Wiki contains advice on the following topics, including a separate page for each main `gpid` command:  
+1. [Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction): Preparing a reference directory using `gpid reference`.  
+2. [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration): Optimising the pipeline settings using `gpid calibrate`.  
+3. [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation): Estimating the accuracy of identification using `gpid validate`.    
+4. [Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification). Identifying a sample using `gpid identify`.  
+5. [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation): Interpretation of the identification results.  
+6. [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial): Hands-on tutorial using example data.    
 
 ## Pipeline summary
 The key steps of the GeneParliamentID pipeline are:
