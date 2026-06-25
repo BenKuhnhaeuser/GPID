@@ -1,8 +1,10 @@
 # GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding
 
-
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
 Current version: 1.1.2 (June 2026)
+
+**Citation**  
+Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** (In review)
 
 ## Overview
 GeneParliamentID (GPID) is a pipeline for sample identification using hundreds or thousands of genes, such as those generated using targeted sequence capture.  
@@ -129,6 +131,3 @@ This allows you to quickly familiarise yourself with:
 It might also provide a useful template for setting up your own analyses.
 
 To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
-
-## Citation
-Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. **GeneParliamentID: A pipeline for multi-gene DNA barcoding.** (In review)
