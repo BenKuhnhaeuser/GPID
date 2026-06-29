@@ -82,6 +82,41 @@ Method calibration is structured into five subcommands:
   
 Note: It is possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration#bypassing-method-calibration). This is *not* recommended as it will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters. However, it may be justified e.g. for a first explorative analysis or if a test dataset for calibration is not available.
 
+#### `calibration` folder
+This folder contains the three required calibration files.  
+All calibration files were produced using the calibration script and a set of test samples of known identity, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
+  
+**File `calibration_gene_performance.csv`:**  
+This file contains the gene performance for each gene (`id_correct_pct`), i.e. the percentage of test samples that were correctly identified to species.
+  
+|gene|id_correct_pct|
+|----|-----------|
+|ANGIO353g4471|56.67|
+|ANGIO353g4527|65.22|
+|ANGIO353g4691|65.11|
+|ANGIO353g4724|85|
+|ANGIO353g4744|47.56|
+  
+**File `calibration_filtering_thresholds.csv`:**  
+This file contains the thresholds that were identified as optimal for the given lineage.
+    
+|simimilarity|length|gap|mismatch|evalue|bitscore|gene_performance|parliament_size|
+|-|-|-|-|-|-|-|-|
+|98|100|1|5|1e-60|200|30|10|
+  
+**File `calibration_confidence_support.csv`:**  
+This file contains the probability of the top identification being correct, close or wrong, depending on the percentage of genes supporting the identification.   
+For example, an identification supported by between 40 and 60% of genes has a probability of 82.14% of being `correct` (correct to species level), 17.86% of being `close` (correct to a user-defined group of closely related species), and 0% of being `wrong` (neither correct nor close).
+  
+|support|correct|close|wrong|
+|-------|-------|-----|-----|
+|[0,20]|0|0|100|
+|(20,40]|78.57|21.43|0|
+|(40,60]|82.14|17.86|0|
+|(60,80]|100|0|0|
+|(80,100]|100|0|0|
+
+
 ### 3. Method validation
 This allows to assess the accuracy of identification using test samples of known identity. Method validation consists of three subcommands that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation). The base command is:  
 `gpid validate`  
