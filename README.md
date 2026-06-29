@@ -101,7 +101,7 @@ For a detailed description of the Gene Parliament figure and table and their int
 #### Gene Parliament figure
 The Gene Parliament figure gives a quick overview of the top 10 identifications that were retrieved and their relative support.  
 
-<img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
+<img width="800" alt="Gene Parliament CQL_2" src="https://github.com/user-attachments/assets/d3b1d9da-e18f-4507-bfb4-8ee523509d68" />
 
 #### Gene Parliament table
 To see all identifications that were retrieved, we can have a look at the Gene Parliament table. Importantly, the table contains for the top identification information on the probability of the identification being correct (correct to species level), close (correct to species group) or wrong (neither correct to species nor to species group).  
