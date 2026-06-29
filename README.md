@@ -1,3 +1,4 @@
+
 # GeneParliamentID:<br>A pipeline for multi-gene DNA barcoding
 
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
@@ -29,8 +30,7 @@ The key steps of the GeneParliamentID pipeline are:
 5. Flag the sample as data-deficient if the number of genes (parliament size) is below the user-defined threshold
 6. Select identification with most support as the **top identification**
 7. Evaluate confidence in the top identification based on the percentage of genes supporting this identification  
-<img width="600" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/57cf5a9f-b1e0-46da-85ba-d020ff2c93a6" />  
-  
+<img width="600" alt="GeneParliamentID pipeline" src="https://github.com/user-attachments/assets/2fe0f86a-e1a3-4603-b3f5-0e6623bd176b" />
 
 ## Setup
 
