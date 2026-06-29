@@ -11,22 +11,14 @@ GeneParliamentID (GPID) is a pipeline for sample identification using hundreds o
 
 GPID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification. Besides sample identification, the pipeline includes reference directory preparation, method calibration and method validation.    
 
-The pipeline is structured into four main commands:  
-1. `gpid reference`: Prepare a reference directory  
-2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings  
-3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification
-4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings  
+The pipeline is structured into four main commands that are explained in detail in the [Wiki](https://github.com/BenKuhnhaeuser/GPID/wiki):  
+1. `gpid reference`: Prepare a reference directory. See [1. Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction).  
+2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).  
+3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).  
+4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).
 
-## Wiki
-For detailed instructions on how to use and interpret GPID, please visit the [Wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
+The Wiki also contains guidance on the [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation) of the identification results and a hands-on [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial) using example data.
 
-The Wiki contains advice on the following topics, including a separate page for each main `gpid` command:  
-1. [Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction): Preparing a reference directory using `gpid reference`.  
-2. [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration): Optimising the pipeline settings using `gpid calibrate`.  
-3. [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation): Estimating the accuracy of identification using `gpid validate`.    
-4. [Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification). Identifying a sample using `gpid identify`.  
-5. [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation): Interpretation of the identification results.  
-6. [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial): Hands-on tutorial using example data.    
 
 ## Pipeline summary
 The key steps of the GeneParliamentID pipeline are:
@@ -42,13 +34,10 @@ The key steps of the GeneParliamentID pipeline are:
 
 ## Setup
 
-### Operating system
-GeneParliamentID is a command-line tool written for Unix operating systems such as Linux.  
-
 ### System requirements
-The system requirements for running GPID depend on the size of the reference dataset and the number of genes analysed. For the datasets with which GPID was tested for the publication, they were:  
-- Rattans: XXXGB RAM, XXX CPU cores
-- Mahoganies: XXXGB RAM, XXX CPU cores 
+GeneParliamentID is a command-line tool written for Unix-operating systems such as Linux.  
+
+The minimum requirements for running GPID are 1 CPU and 1 GB memory. Depending on the size of the dataset analysed, more processing power or memory may be needed.
 
 ### Install GPID
 We recommend installation of GPID including all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
@@ -63,78 +52,37 @@ To confirm that the installation has worked and show a help message on how to us
 `gpid`  
 
 ## Quick start
-The fundamental commands for running GeneParliamentID are given here. For detailed instructions, see the [wiki](https://github.com/BenKuhnhaeuser/GPID/wiki).  
+To give you a first taste of the capabilities of GPID, this is a minimal example that only covers sample identification.  
 
-### 1. Reference construction
-Run a few checks and prepare a [reference](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction) directory with BLAST databases for all genes in the directory. There is one single command:  
-`gpid reference -r <reference directory>`
+[Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction), [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration) and [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation) have already been performed. Note that **these steps only need to be conducted once** for a given lineage and set of genes.  
 
-### 2. Method calibration
-When running the GeneParliamentID pipeline for a lineage for the first time, method calibration using a test dataset is highly recommended to identify the optimal pipeline parameters for this lineage, which will increase the accuracy of identification. This involves multiple steps that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration). The base command is:  
-`gpid calibrate`  
-
-Method calibration is structured into five subcommands:  
-`gpid calibrate prepare`: Prepare input files for calibration by matching each test sample against the reference dataset  
-`gpid calibrate alignments`: Identify optimal alignment filtering thresholds  
-`gpid calibrate genes`: Estimate gene performance and identify optimal gene threshold  
-`gpid calibrate parliament`: Identify optimal minimum parliament size threshold  
-`gpid calibrate combine`: Combine manually selected thresholds in a calibration file for subsequent use  
-  
-Note: It is possible to [bypass method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration#bypassing-method-calibration). This is *not* recommended as it will most likely result in considerably reduced accuracy of identification compared to running the pipeline with optimal parameters. However, it may be justified e.g. for a first explorative analysis or if a test dataset for calibration is not available.
-
-#### `calibration` folder
-This folder contains the three required calibration files.  
-All calibration files were produced using the calibration script and a set of test samples of known identity, see [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/Method-calibration).
-  
-**File `calibration_gene_performance.csv`:**  
-This file contains the gene performance for each gene (`id_correct_pct`), i.e. the percentage of test samples that were correctly identified to species.
-  
-|gene|id_correct_pct|
-|----|-----------|
-|ANGIO353g4471|56.67|
-|ANGIO353g4527|65.22|
-|ANGIO353g4691|65.11|
-|ANGIO353g4724|85|
-|ANGIO353g4744|47.56|
-  
-**File `calibration_filtering_thresholds.csv`:**  
-This file contains the thresholds that were identified as optimal for the given lineage.
-    
-|simimilarity|length|gap|mismatch|evalue|bitscore|gene_performance|parliament_size|
-|-|-|-|-|-|-|-|-|
-|98|100|1|5|1e-60|200|30|10|
-  
-**File `calibration_confidence_support.csv`:**  
-This file contains the probability of the top identification being correct, close or wrong, depending on the percentage of genes supporting the identification.   
-For example, an identification supported by between 40 and 60% of genes has a probability of 82.14% of being `correct` (correct to species level), 17.86% of being `close` (correct to a user-defined group of closely related species), and 0% of being `wrong` (neither correct nor close).
-  
-|support|correct|close|wrong|
-|-------|-------|-----|-----|
-|[0,20]|0|0|100|
-|(20,40]|78.57|21.43|0|
-|(40,60]|82.14|17.86|0|
-|(60,80]|100|0|0|
-|(80,100]|100|0|0|
+For a full worked example including reference construction to method calibration and validation, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).  
 
 
-### 3. Method validation
-This allows to assess the accuracy of identification using test samples of known identity. Method validation consists of three subcommands that are explained in detail [here](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation). The base command is:  
-`gpid validate`  
+### Download data
+To download the folder, run:  
+`wget https://github.com/BenKuhnhaeuser/GPID/blob/main/quickstart.tar.gz`  
 
-Method validation is structured into three subcommands:  
-`gpid validate prepare`: Prepare input files for calibration by matching each test sample against the reference dataset  
-`gpid validate confidence`: Estimate validation confidence for different numbers of support bins  
-`gpid validate bins`: Save validation confidence support probabilities for selected number of bins  
+Then, extract the files in the folder using:  
+`tar -zxvf example_data.tar.gz`  
 
-### 4. Sample identification
-Once the reference has been constructed and method calibration and validation are completed, you can conduct sample identification without the need to repeat the above steps. Sample identification is conducted using a single command that takes the outputs prepared using `gpid reference`, `gpid calibrate` and `gpid validate` as inputs. There is a single command with multiple flags:  
-`gpid identify -i <sample directory> -r <reference directory> [-g <gene performance file> -t <thresholds file> -c <confidence support file>] [-s <species groups file>]`  
+The extracted directory contains the following files and folders:  
+- `reference`: folder containing BLAST reference databases for all genes. See [1. Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction).
+- `calibration_gene_performance.csv`: file listing performance of each gene, i.e. the percentage of samples correctly identified to species, estimated using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
+- `calibration_filtering_thresholds.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
+- `validation_confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during method validation. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
+- `species_groups.csv`: optional file specifying for each species a user-defined group of closely related species. See See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
+- `samples`: folder containig a sub-folder for each sample to be identified. Each sub-folder contains one fasta file per gene for the sample to be identified, and each file contains a single corresponding gene sequence for the sample. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).   
+
+### Sample identification
+Sample identification is conducted using the following command:  
+`gpid identify -i samples/CQL_2/ -r reference/ -g calibration_gene_performance.csv -t calibration_filtering_thresholds.csv -c calibration_confidence_support.csv -s species_groups.csv`  
 
 The required input arguments are:  
 `-i`: Sample directory containing one FASTA file per gene for the sample to identify  
 `-r`:  Reference directory containing one FASTA file per gene and the corresponding BLAST databases  
 
-For method calibration and validation, the standard file names and locations produced in steps 2-3 are used by default. This can be specified using:  
+For method calibration and validation, the standard file names and locations produced during method calibration and validation are used by default. This can be specified using:  
 `-g`: Gene performance file  
 `-t`: Filtering thresholds file  
 `-c`: Confidence estimates file  
@@ -142,27 +90,34 @@ For method calibration and validation, the standard file names and locations pro
 Optionally, manually defined groups of closely related species can be included in the results:  
 `-s`: Species groups file
  
-See [here](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
+See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
 
 
-## Pipeline outputs
-The GeneParliamentID pipeline summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
-  
-The Gene Parliament is presented both as a table and as a figure.
+### Pipeline outputs
+GPID summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications. The Gene Parliament is presented both as a table and as a figure.  
 
-Example Gene Parliament figure:  
-<img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
-  
 For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation).
 
+#### Gene Parliament figure
+The Gene Parliament figure gives a quick overview of the top 10 identifications that were retrieved and their relative support.  
 
-## Tutorial  
-We provide a worked example of the GeneParliamentID pipeline using test data and calibration files.  
-This allows you to quickly familiarise yourself with:  
-- input file requirements and formats
-- how to run the pipeline
-- the output files produced
+<img width="800" alt="Entandrophragma_angolense_CQL_EA9_geneparliament" src="https://github.com/user-attachments/assets/70cae691-0e4b-45fd-bbcb-15b02621c704" />
 
-It might also provide a useful template for setting up your own analyses.
+#### Gene Parliament table
+To see all identifications that were retrieved, we can have a look at the Gene Parliament table. Importantly, the table contains for the top identification information on the probability of the identification being correct (correct to species level), close (correct to species group) or wrong (neither correct to species nor to species group).  
 
-To access the worked example, see [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
+| Sample | Rank | Identification | Species_group | Support_pct | Support_count | Parliament_size | Data_checks | ID_correct_pct | ID_close_pct |ID_wrong_pct|  
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | 
+| CQL_2 | 1 | *Entandrophragma_angolense* | Entandrophragma | 45.08 | 55| 122 | PASSED | 82.14 | 17.86 | 0 |
+| CQL_2 | 2 | *Entandrophragma_excelsum* | Entandrophragma | 18.85 | 23 |
+| CQL_2 | 3 | *Entandrophragma_congoense* | Entandrophragma | 16.39 | 20 |
+| ... |  |  |  |  |  |
+
+### And the identification is...?
+Inspection of the Gene Parliament figure and table shows that a clear majority of genes (45.1%) support the identification as *Entandrophragma angolense*, whilst *Entandrophragma excelsum* (18.85%) and *Entandrophragma congoense* (16.39%) also get sizeable support. Other species have almost negligible support, but all belong to the same genus *Entandrophragma*.  
+
+The table indicates a probability of 82.14% that the identification is `correct` to species level, and a further 17.86% (thus totaling 100%) that the identification is `close`, i.e. correct to species group (in this case genus). The probability that the identification is `wrong`, i.e. neither correct nor close, is estimated to be 0. Overall, we can be fully confident that the sample belongs to the genus *Entandrophragma*, and have high confidence that it was taken from the species *Entandrophragma_angolense*.
+
+
+## Next steps
+To work through the full GPID workflow using example data, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
