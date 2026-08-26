@@ -41,7 +41,9 @@ The minimum requirements for running GPID are 1 CPU and 1 GB memory. Depending o
 
 ### Install GPID
 We recommend installation of GPID including all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
-`conda create --name gpid gpid`
+`conda create --name gpid gpid`  
+
+The dependencies installed are [BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) and [R](https://www.r-project.org/) with the packages [dplyr](https://dplyr.tidyverse.org), [ggplot2](https://ggplot2.tidyverse.org), [ggpubr](https://rpkgs.datanovia.com/ggpubr), [ggtext](https://github.com/wilkelab/ggtext), [stringr](https://stringr.tidyverse.org), [svglite](https://github.com/r-lib/svglite), [tidyr](https://tidyr.tidyverse.org) and [withr](https://withr.r-lib.org).  
 
 ### Activate GPID environment
 To activate the GPID conda environment, use:  
