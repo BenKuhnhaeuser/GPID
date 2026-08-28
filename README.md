@@ -37,7 +37,7 @@ The key steps of the GeneParliamentID pipeline are:
 ### System requirements
 GeneParliamentID is a command-line tool written for Unix-operating systems such as Linux.  
 
-The minimum requirements for running GPID are 1 CPU and 1 GB memory. Depending on the size of the dataset analysed, more processing power or memory may be needed.
+The computational requirements for running GPID depend on the dataset. As a point of reference, running the tutorial (100 genes, 91 reference samples and 108 calibration and validation samples) with 1 CPU requires approx. 175 MB memory.
 
 ### Install GPID
 We recommend installation of GPID including all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
