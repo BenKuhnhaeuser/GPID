@@ -134,4 +134,6 @@ Importantly, the table contains the results from [Method validation](https://git
 Based on these results, we can have high confidence that the sample is [*Calamus melanochaetes*](https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:665239-1), which is widespread across the Asian tropics.  
 
 ## Next steps
+Have a go at identifying the other two samples, `Calamus_sample_2` and `Calamus_sample_3`. To check whether you are interpreting the results correctly, have a look at [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation).  
+
 To work through the full GPID workflow including reference construction, method calibration and method validation, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
