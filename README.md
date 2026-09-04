@@ -37,7 +37,7 @@ The key steps of the GeneParliamentID pipeline are:
 ### System requirements
 GeneParliamentID is a command-line tool written for Unix-operating systems such as Linux.  
 
-The computational requirements for running GPID depend on the dataset. As a point of reference, running the tutorial (100 genes, 91 reference samples and 108 calibration and validation samples) with 1 CPU requires approx. 175 MB memory.
+The computational requirements for running GPID depend on the dataset. As a point of reference, running the tutorial with 1 CPU requires approx. 175 MB memory.
 
 ### Install GPID
 We recommend installation of GPID including all dependencies using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) with a new environment:  
@@ -54,7 +54,8 @@ To confirm that the installation has worked and show a help message on how to us
 `gpid`  
 
 ## Quick start
-To give you a first taste of the capabilities of GPID, this is a minimal example that only covers sample identification.  
+To give you a first taste of the capabilities of GPID, this is a minimal example for the identification of  that only covers sample identification.  
+For this purpose, we identify a rattan palm of the genus *Calamus* using a small test dataset comprised of 96 genes and 91 reference taxa.  
 
 [Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction), [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration) and [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation) have already been performed. Note that **these steps only need to be conducted once** for a given lineage and set of genes.  
 
