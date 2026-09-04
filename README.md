@@ -64,7 +64,7 @@ For a full worked example including reference construction to method calibration
 
 ### Download data
 To download the folder, run:  
-`wget https://github.com/BenKuhnhaeuser/GPID/blob/main/quickstart.tar.gz`  
+`wget https://github.com/BenKuhnhaeuser/GPID/raw/refs/heads/main/quickstart.tar.gz`  
 
 Then, extract the files in the folder using:  
 `tar -zxvf quickstart.tar.gz`  
