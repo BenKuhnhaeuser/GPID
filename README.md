@@ -66,23 +66,23 @@ To download the folder, run:
 `wget https://github.com/BenKuhnhaeuser/GPID/blob/main/quickstart.tar.gz`  
 
 Then, extract the files in the folder using:  
-`tar -zxvf example_data.tar.gz`  
+`tar -zxvf quickstart.tar.gz`  
 
 The extracted directory contains the following files and folders:  
 - `reference`: folder containing BLAST reference databases for all genes. See [1. Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction).
-- `calibration_gene_performance.csv`: file listing performance of each gene, i.e. the percentage of samples correctly identified to species, estimated using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
-- `calibration_filtering_thresholds.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
-- `validation_confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during method validation. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
+- `gene_performance.csv`: file listing performance of each gene, i.e. the percentage of samples correctly identified to species, estimated using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
+- `thresholds.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
+- `confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during method validation. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
 - `species_groups.csv`: optional file specifying for each species a user-defined group of closely related species. See See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
 - `samples`: folder containing a sub-folder for each sample to be identified. Each sub-folder contains one fasta file per gene for the sample to be identified, and each file contains a single corresponding gene sequence for the sample. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).   
 
 ### Sample identification
 Sample identification is conducted using the following command:  
-`gpid identify -i samples/CQL_2/ -r reference/ -g calibration_gene_performance.csv -t calibration_filtering_thresholds.csv -c calibration_confidence_support.csv -s species_groups.csv`  
+`gpid identify -i samples/Calamus_sample_1/ -r reference/ -g gene_performance.csv -t thresholds.csv -c confidence_support.csv -s species_groups.csv`  
 
 The required input arguments are:  
-`-i`: Sample directory containing one FASTA file per gene for the sample to identify  
-`-r`:  Reference directory containing one FASTA file per gene and the corresponding BLAST databases  
+`-i`: Sample directory containing one `fasta` file per gene for the sample to identify  
+`-r`:  Reference directory containing one `fasta` file per gene and the corresponding BLAST databases  
 
 For method calibration and validation, the standard file names and locations produced during method calibration and validation are used by default. This can be specified using:  
 `-g`: Gene performance file  
@@ -96,30 +96,41 @@ See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sa
 
 
 ### Pipeline outputs
-GPID summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications. The Gene Parliament is presented both as a table and as a figure.  
+GPID summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
 
+The following output files are produced in the directory `identification/Calamus_sample_1`:
+- Gene Parliament figure with top 10 identifications: `Calamus_sample_1_gpid.pdf`
+- Gene Parliament table with all identifications: `Calamus_sample_1_gpid.csv`
+- Individual BLAST identifications of each gene: `Calamus_sample_1_blast.tsv`
+  
 For a detailed description of the Gene Parliament figure and table and their interpretation, see [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation).
 
 #### Gene Parliament figure
-The Gene Parliament figure gives a quick overview of the top 10 identifications that were retrieved and their relative support.  
+The Gene Parliament figure `Calamus_sample_1_gpid.pdf` gives a quick overview of the (up to) top 10 identifications that were retrieved and their relative support.  
 
-<img width="800" alt="Gene Parliament CQL_2" src="https://github.com/user-attachments/assets/d3b1d9da-e18f-4507-bfb4-8ee523509d68" />
+<img width="1095" height="545" alt="image" src="https://github.com/user-attachments/assets/1fd4b993-5873-4477-9a32-4440ff866b73" />
+
+In this case, a clear majority of genes support the identification as *Calamus melanochaetes*. There are several other species identifications, but these are only supported by one or two genes.  
+
 
 #### Gene Parliament table
-To see all identifications that were retrieved, we can have a look at the Gene Parliament table. Importantly, the table contains for the top identification information on the probability of the identification being correct (correct to species level), close (correct to species group) or wrong (neither correct to species nor to species group).  
+To see all identifications that were retrieved, we can have a look at the Gene Parliament table `Calamus_sample_1_gpid.csv`. This file contains all identifications in tabular format, which may be useful for further analysis of the results.  
+
+Importantly, the table contains the results from [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation), providing the percentage of validation samples that were correctly, closely (to species group) or wrongly identified at this level of support. In this case, we had decided to divide the validation samples into three bins of `0-33.33%`, `>33.33-66.66%` and `>66.66-100%`. Based on the percentage of genes supporting the identification of `Calamus_sample_1` as *Calamus melanochaetes*, the validation results from the third bin `>66.66-100%` are used. In this case, all validation samples at this level of support were correct identified. The variable `ID_correct_pct` thus contains the value `100`, whereas the variables `ID_close_pct` and `ID_wrong_pct` are `0`.  
 
 | Sample | Rank | Identification | Species_group | Support_pct | Support_count | Parliament_size | Data_checks | ID_correct_pct | ID_close_pct |ID_wrong_pct|  
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | 
-| CQL_2 | 1 | *Entandrophragma_angolense* | Entandrophragma | 45.08 | 55| 122 | PASSED | 82.14 | 17.86 | 0 |
-| CQL_2 | 2 | *Entandrophragma_excelsum* | Entandrophragma | 18.85 | 23 |
-| CQL_2 | 3 | *Entandrophragma_congoense* | Entandrophragma | 16.39 | 20 |
-| ... |  |  |  |  |  |
+| Calamus_sample_1 | 1 | Calamus_melanochaetes | Melanochaetes_group | 74.19 | 23 | 31 | PASSED | 100 | 0 | 0 |
+| Calamus_sample_1 | 2 | Calamus_calicarpus | Melanochaetes_group | 6.45 | 2 |
+| Calamus_sample_1 | 3 | Calamus_ater | Acamptostachys_group | 3.22 | 1 |
+| Calamus_sample_1 | 3 | Calamus_mollispinus | Applanatus_group | 3.22 | 1 |
+| Calamus_sample_1 | 3 | Calamus_ruber | Resiniferae_group | 3.22 | 1 |
+| Calamus_sample_1 | 3 | Calamus_pseudoconcolor | Concolor_group | 3.22 | 1 |
+| Calamus_sample_1 | 3 | Calamus_calapparius | Calapparius_group | 3.22 | 1 |
+| Calamus_sample_1 | 3 | Calamus_subangulatus | Concolor_group | 3.22 | 1 |
 
 ### And the identification is...?
-Inspection of the Gene Parliament figure and table shows that a clear majority of genes (45.1%) support the identification as *Entandrophragma angolense*, whilst *Entandrophragma excelsum* (18.85%) and *Entandrophragma congoense* (16.39%) also get sizeable support. Other species have almost negligible support, but all belong to the same genus *Entandrophragma*.  
-
-The table indicates a probability of 82.14% that the identification is `correct` to species level, and a further 17.86% (thus totaling 100%) that the identification is `close`, i.e. correct to species group (in this case genus). The probability that the identification is `wrong`, i.e. neither correct nor close, is estimated to be 0. Overall, we can be fully confident that the sample belongs to the genus *Entandrophragma*, and have high confidence that it was taken from the species *Entandrophragma_angolense*.
-
+Based on these results, we can have high confidence that the sample is [*Calamus melanochaetes*](https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:665239-1), which is widespread across the Asian tropics.  
 
 ## Next steps
-To work through the full GPID workflow using example data, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
+To work through the full GPID workflow including reference construction, method calibration and method validation, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
