@@ -75,17 +75,17 @@ The extracted directory contains the following files and folders:
 - `thresholds.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
 - `confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during method validation. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
 - `species_groups.csv`: optional file specifying for each species a user-defined group of closely related species. See See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
-- `samples`: folder containing a sub-folder for each sample to be identified. Each sub-folder contains one fasta file per gene for the sample to be identified, and each file contains a single corresponding gene sequence for the sample. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).   
+- `samples`: folder containing a sub-folder for each sample to be identified. Each sub-folder contains one fasta file per gene for the sample to be identified, and each file contains a single corresponding gene sequence for the sample. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).
+
+After downloading and extracting the folder, change into it using:  
+`cd quickstart/`  
 
 ### Sample identification
-Sample identification is conducted using the following command:  
-`gpid identify -i samples/Calamus_sample_1/ -r reference/ -g gene_performance.csv -t thresholds.csv -c confidence_support.csv -s species_groups.csv`  
-
-The required input arguments are:  
+Sample identification is conducted using the command `gpid identify`.  
+  
+The main input arguments are:  
 `-i`: Sample directory containing one `fasta` file per gene for the sample to identify  
 `-r`:  Reference directory containing one `fasta` file per gene and the corresponding BLAST databases  
-
-For method calibration and validation, the standard file names and locations produced during method calibration and validation are used by default. This can be specified using:  
 `-g`: Gene performance file  
 `-t`: Filtering thresholds file  
 `-c`: Confidence estimates file  
@@ -95,6 +95,8 @@ Optionally, manually defined groups of closely related species can be included i
  
 See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
 
+To identify sample `Calamus_sample_1`, run:  
+`gpid identify -i samples/Calamus_sample_1/ -r reference/ -g gene_performance.csv -t thresholds.csv -c confidence_support.csv -s species_groups.csv`  
 
 ### Pipeline outputs
 GPID summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
@@ -109,7 +111,7 @@ For a detailed description of the Gene Parliament figure and table and their int
 #### Gene Parliament figure
 The Gene Parliament figure `Calamus_sample_1_gpid.pdf` gives a quick overview of the (up to) top 10 identifications that were retrieved and their relative support.  
 
-<img width="1095" height="545" alt="image" src="https://github.com/user-attachments/assets/1fd4b993-5873-4477-9a32-4440ff866b73" />
+<img width="800" height="398" alt="image" src="https://github.com/user-attachments/assets/df9e31ca-9c12-46f8-a9e8-d54785f2f812" /> 
 
 In this case, a clear majority of genes support the identification as *Calamus melanochaetes*. There are several other species identifications, but these are only supported by one or two genes.  
 
