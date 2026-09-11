@@ -80,6 +80,10 @@ The extracted directory contains the following files and folders:
 After downloading and extracting the folder, change into it using:  
 `cd quickstart/`  
 
+### Activate GPID environment
+Activate the GPID conda environment:  
+`conda activate gpid`
+
 ### Sample identification
 Sample identification is conducted using the command `gpid identify`.  
   
