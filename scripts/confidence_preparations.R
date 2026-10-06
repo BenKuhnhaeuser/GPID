@@ -1,14 +1,18 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Prepare confidence RDS data with exact-species and supplied-group or genus-based match labels.
 
+# --- Read CLI paths and optional grouping inputs ---
 args <- commandArgs(trailingOnly = TRUE)
 
-if (!length(args) %in% c(2, 3)) {
-  stop("Usage: validation_preparations.R <validation_blast.tsv> <prepared_output.rds> [species_groups.csv]", call. = FALSE)
+if (!length(args) %in% c(2, 3, 4)) {
+  stop("Usage: confidence_preparations.R <confidence_blast.tsv> <prepared_output.rds> [species_groups.csv] [reference_dir]", call. = FALSE)
 }
 
 blast_file <- args[[1]]
 prepared_output <- args[[2]]
-species_groups_file <- if (length(args) == 3) args[[3]] else ""
+species_groups_file <- if (length(args) >= 3) args[[3]] else ""
+reference_dir <- if (length(args) == 4) args[[4]] else ""
 
 required_columns <- c("gene", "query", "target", "pident", "length", "mismatch", "gapopen", "evalue", "bitscore")
 
@@ -16,6 +20,7 @@ suppressPackageStartupMessages({
   library(dplyr)
 })
 
+# --- Load and validate BLAST matches ---
 ids <- read.csv(blast_file, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
 
 missing_columns <- setdiff(required_columns, names(ids))
@@ -24,11 +29,13 @@ if (length(missing_columns) > 0) {
 }
 
 if (nrow(ids) == 0) {
-  stop("BLAST file does not contain any validation matches.", call. = FALSE)
+  stop("BLAST file does not contain any confidence matches.", call. = FALSE)
 }
 
+# species_name(): Extract the first two underscore-delimited header fields as the species name.
 species_name <- function(x) {
   parts <- strsplit(as.character(x), "_", fixed = TRUE)
+  # Callback: Join the genus and species tokens, or return NA for incomplete headers.
   vapply(parts, function(part) {
     if (length(part) < 2) {
       NA_character_
@@ -38,8 +45,10 @@ species_name <- function(x) {
   }, character(1))
 }
 
+# genus_name(): Extract the first underscore-delimited field for default genus grouping.
 genus_name <- function(x) {
   parts <- strsplit(as.character(x), "_", fixed = TRUE)
+  # Callback: Return the genus token, or NA when the header has no usable token.
   vapply(parts, function(part) {
     if (length(part) < 1) {
       NA_character_
@@ -49,6 +58,7 @@ genus_name <- function(x) {
   }, character(1))
 }
 
+# --- Derive species names and retain the original sample-count denominator ---
 ids <- ids %>%
   mutate(
     query_sp = species_name(query),
@@ -56,6 +66,7 @@ ids <- ids %>%
     query_samples = n_distinct(query)
   )
 
+# --- Choose supplied groups or derive the default genus groups ---
 if (nzchar(species_groups_file)) {
   species_groups <- read.csv(species_groups_file, stringsAsFactors = FALSE, colClasses = "character")
 
@@ -72,6 +83,13 @@ if (nzchar(species_groups_file)) {
     )
   }
 
+  species_groups$species_group[is.na(species_groups$species_group) |
+    trimws(species_groups$species_group) %in% c("", "NA")] <- NA_character_
+  script_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1]])
+  source(file.path(dirname(script_file), "species_groups.R"))
+  reference_species <- if (nzchar(reference_dir)) reference_fasta_species(reference_dir) else unique(ids$target_sp)
+  warn_missing_species_groups(reference_species, species_groups)
+
   ids <- left_join(ids, species_groups, by = c("query_sp" = "genus_species")) %>%
     rename(query_group = species_group)
   ids <- left_join(ids, species_groups, by = c("target_sp" = "genus_species")) %>%
@@ -86,6 +104,8 @@ if (nzchar(species_groups_file)) {
 
 ids <- ids %>%
   mutate(
+    # Keep exact matches separate from other same-group matches for stacked plots.
+    # Inclusive close probabilities are calculated only when exporting the CSV.
     id_correct = query_sp == target_sp,
     id_correct_group = query_group == target_group,
     id_correct_close = ifelse(
@@ -95,6 +115,7 @@ ids <- ids %>%
     )
   )
 
+# --- Preserve categorical fields and save the prepared dataset ---
 factor_columns <- c(
   "gene", "query", "target", "query_sp", "target_sp",
   "query_group", "target_group", "id_correct", "id_correct_group",
@@ -106,6 +127,6 @@ ids$id_correct_close <- factor(ids$id_correct_close, c("correct", "close", "wron
 dir.create(dirname(prepared_output), recursive = TRUE, showWarnings = FALSE)
 saveRDS(ids, prepared_output)
 
-message("Prepared ", nrow(ids), " validation BLAST match(es) across ", length(unique(ids$query)), " sample(s).")
+message("Prepared ", nrow(ids), " confidence BLAST match(es) across ", length(unique(ids$query)), " sample(s).")
 message("Output file written:")
 message(prepared_output)

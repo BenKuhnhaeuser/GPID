@@ -1,18 +1,23 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Aggregate per-gene identifications, attach calibrated confidence, and write sample tables and figures.
 
 options(stringsAsFactors = FALSE, warn = 1)
 
+# abort(): Stop processing with a formatted, user-readable error message.
 abort <- function(...) {
   message_text <- sprintf(...)
   cat(sprintf("Error: %s\n", message_text), file = stderr())
   quit(save = "no", status = 1)
 }
 
+# warn_user(): Report a nonfatal analysis or output warning.
 warn_user <- function(...) {
   message_text <- sprintf(...)
   cat(sprintf("Warning: %s\n", message_text), file = stderr())
 }
 
+# --- Dependency checks and command-line settings ---
 required_packages <- c("dplyr", "ggplot2", "ggtext", "stringr")
 missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
 
@@ -81,7 +86,9 @@ normalised_output_dir <- normalizePath(output_dir, winslash = "/", mustWork = FA
 if (!dir.exists(normalised_output_dir)) {
   created_output_dir <- tryCatch(
     dir.create(normalised_output_dir, recursive = TRUE, showWarnings = FALSE),
+    # Callback: Convert directory-creation warnings into a checked failure result.
     warning = function(warning) FALSE,
+    # Callback: Convert directory-creation errors into a checked failure result.
     error = function(error) FALSE
   )
 
@@ -90,6 +97,8 @@ if (!dir.exists(normalised_output_dir)) {
   }
 }
 
+# --- Output settings, overwrite protection, and input readers ---
+# parse_output_formats(): Normalize requested figure/table formats and expand the all shorthand.
 parse_output_formats <- function(raw_formats) {
   tokens <- unlist(strsplit(raw_formats, ",", fixed = TRUE), use.names = FALSE)
   tokens <- tolower(trimws(tokens))
@@ -118,6 +127,7 @@ parse_output_formats <- function(raw_formats) {
 
 requested_output_formats <- parse_output_formats(output_formats_raw)
 
+# parse_overwrite_flag(): Convert accepted overwrite flag representations to one logical setting.
 parse_overwrite_flag <- function(raw_value) {
   cleaned_value <- tolower(trimws(raw_value))
 
@@ -134,14 +144,17 @@ parse_overwrite_flag <- function(raw_value) {
 
 overwrite_output <- parse_overwrite_flag(overwrite_output_raw)
 
+# output_requested(): Return whether the current run requests the named output format.
 output_requested <- function(format_name) {
   format_name %in% requested_output_formats
 }
 
+# output_path(): Resolve an output basename inside the configured output directory.
 output_path <- function(filename) {
   file.path(normalised_output_dir, filename)
 }
 
+# planned_output_files(): List the files expected for the current sample and requested output settings.
 planned_output_files <- function() {
   files <- character()
 
@@ -164,6 +177,7 @@ planned_output_files <- function() {
   files
 }
 
+# check_existing_output_files(): Detect output collisions and enforce the explicit overwrite setting.
 check_existing_output_files <- function() {
   existing_files <- planned_output_files()
   existing_files <- existing_files[file.exists(existing_files)]
@@ -190,6 +204,7 @@ check_existing_output_files <- function() {
 
 check_existing_output_files()
 
+# read_csv_checked(): Read an input table and include the source filename in any parsing error.
 read_csv_checked <- function(path, sep = ",", ...) {
   tryCatch(
     read.csv(
@@ -200,12 +215,14 @@ read_csv_checked <- function(path, sep = ",", ...) {
       strip.white = TRUE,
       ...
     ),
+    # Callback: Convert the read failure into an error identifying the input file.
     error = function(error) {
       abort("Could not read %s: %s", path, conditionMessage(error))
     }
   )
 }
 
+# ensure_columns(): Reject input tables missing required column names.
 ensure_columns <- function(data, required_columns, file_label) {
   missing_columns <- setdiff(required_columns, names(data))
   if (length(missing_columns) > 0) {
@@ -217,6 +234,7 @@ ensure_columns <- function(data, required_columns, file_label) {
   }
 }
 
+# ensure_numeric_columns(): Convert requested columns to numbers while distinguishing missing from malformed values.
 ensure_numeric_columns <- function(data, columns, file_label) {
   for (column in columns) {
     converted <- suppressWarnings(as.numeric(data[[column]]))
@@ -236,17 +254,21 @@ ensure_numeric_columns <- function(data, columns, file_label) {
   data
 }
 
+# extract_species_name(): Extract the Genus_species prefix from BLAST target identifiers.
 extract_species_name <- function(values) {
   match <- str_match(values, "^([^_]+_[^_]+)")
   match[, 2]
 }
 
+# extract_genus_name(): Extract the genus prefix for species without a supplied grouping file.
 extract_genus_name <- function(values) {
   match <- str_match(values, "^([^_]+)")
   match[, 2]
 }
 
+# parse_range_support(): Parse interval boundaries and inclusivity, then reject malformed or overlapping confidence bins.
 parse_range_support <- function(labels) {
+  # Callback: Decode one confidence interval and preserve its endpoint inclusivity.
   parsed <- lapply(labels, function(label) {
     match <- regexec("^([\\[(])\\s*([0-9]+(?:\\.[0-9]+)?)\\s*,\\s*([0-9]+(?:\\.[0-9]+)?)\\s*([\\]\\)])$", label, perl = TRUE)
     groups <- regmatches(label, match)[[1]]
@@ -302,6 +324,7 @@ parse_range_support <- function(labels) {
   parsed
 }
 
+# find_matching_range(): Return the bin containing a support percentage, respecting open and closed boundaries.
 find_matching_range <- function(value, parsed_ranges) {
   matches <- which(
     (value > parsed_ranges$lower | (parsed_ranges$lower_inclusive & value >= parsed_ranges$lower)) &
@@ -315,6 +338,7 @@ find_matching_range <- function(value, parsed_ranges) {
   matches[[1]]
 }
 
+# write_minimal_output(): Write a status-only CSV when no usable identification can be computed.
 write_minimal_output <- function(sample_name, status_code) {
   if (!output_requested("csv")) {
     return(invisible(NULL))
@@ -344,15 +368,18 @@ write_minimal_output <- function(sample_name, status_code) {
   )
 }
 
+# safe_ggsave(): Save a requested figure and report device or file errors without discarding the table.
 safe_ggsave <- function(filename, plot_object, width = 8, height = 4) {
   tryCatch(
     ggsave(filename = filename, plot = plot_object, width = width, height = height),
+    # Callback: Report a failed figure save while allowing other requested outputs to finish.
     error = function(error) {
       warn_user("Could not save %s: %s", filename, conditionMessage(error))
     }
   )
 }
 
+# --- Load and validate the per-gene BLAST evidence ---
 blast_required_columns <- c("gene", "query", "target", "pident", "length", "mismatch", "gapopen", "evalue", "bitscore")
 ids <- read_csv_checked(blast_file, sep = "\t")
 ensure_columns(ids, blast_required_columns, "BLAST results file")
@@ -387,22 +414,14 @@ if (any(is.na(ids$identification))) {
   abort("BLAST target names must begin with <Genus>_<species> so the identification can be extracted.")
 }
 
-gene_performance <- read_csv_checked(gene_performance_file)
-ensure_columns(gene_performance, c("gene", "performance"), "Gene performance file")
-gene_performance <- gene_performance[, c("gene", "performance"), drop = FALSE]
-gene_performance <- ensure_numeric_columns(gene_performance, "performance", "Gene performance file")
-gene_performance$gene <- as.character(gene_performance$gene)
-
-if (anyDuplicated(gene_performance$gene) > 0) {
-  duplicated_genes <- unique(gene_performance$gene[duplicated(gene_performance$gene)])
-  abort(
-    "Gene performance file contains duplicated gene names: %s",
-    paste(duplicated_genes, collapse = ", ")
-  )
-}
+script_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1]])
+source(file.path(dirname(script_file), "gene_performance.R"))
+# --- Load gene performance; explicit NA becomes zero in memory ---
+gene_performance <- read_gene_performance(gene_performance_file)
 
 gene_performance <- rename(gene_performance, gene_performance_pct = performance)
 
+# --- Read named filtering parameters and reshape them for analysis ---
 filtering_thresholds <- read_csv_checked(filtering_thresholds_file)
 threshold_columns <- c(
   "min_similarity",
@@ -414,15 +433,36 @@ threshold_columns <- c(
   "min_gene_performance",
   "min_parliament_size"
 )
-ensure_columns(filtering_thresholds, threshold_columns, "Filtering thresholds file")
-
-if (nrow(filtering_thresholds) < 1) {
-  abort("Filtering thresholds file does not contain any threshold row.")
+# Normalize the legacy eight-column, single-value-row format before shared checks.
+if (ncol(filtering_thresholds) == 8 && !anyDuplicated(names(filtering_thresholds)) &&
+    setequal(names(filtering_thresholds), threshold_columns)) {
+  if (nrow(filtering_thresholds) != 1) {
+    abort("Legacy filtering thresholds file must contain exactly one value row.")
+  }
+  filtering_thresholds <- data.frame(parameter = names(filtering_thresholds),
+                                    value = unlist(filtering_thresholds[1, ], use.names = FALSE),
+                                    stringsAsFactors = FALSE)
 }
-
-filtering_thresholds <- filtering_thresholds[1, threshold_columns, drop = FALSE]
+if (!identical(names(filtering_thresholds), c("parameter", "value"))) {
+  abort("Filtering thresholds file must use parameter,value columns or the eight unique parameter names followed by one value row.")
+}
+filtering_thresholds$parameter <- trimws(filtering_thresholds$parameter)
+if (anyNA(filtering_thresholds$parameter) || anyDuplicated(filtering_thresholds$parameter) ||
+    !setequal(filtering_thresholds$parameter, threshold_columns)) {
+  abort("Filtering thresholds file must contain each of the eight required parameters exactly once.")
+}
+threshold_values <- suppressWarnings(as.numeric(filtering_thresholds$value))
+if (any(!is.finite(threshold_values)) || any(threshold_values < 0)) {
+  abort("Filtering thresholds file must contain finite, non-negative numeric values.")
+}
+filtering_thresholds$value <- threshold_values
+filtering_thresholds <- as.data.frame(as.list(setNames(
+  filtering_thresholds$value[match(threshold_columns, filtering_thresholds$parameter)],
+  threshold_columns
+)), check.names = FALSE)
 filtering_thresholds <- ensure_numeric_columns(filtering_thresholds, threshold_columns, "Filtering thresholds file")
 
+# --- Validate confidence intervals and probability columns ---
 confidence_support <- read_csv_checked(confidence_support_file)
 confidence_columns <- c("range_support", "probability_correct", "probability_close", "probability_wrong")
 ensure_columns(confidence_support, confidence_columns, "Confidence support file")
@@ -451,6 +491,7 @@ confidence_support <- ensure_numeric_columns(
 parsed_ranges <- parse_range_support(confidence_support$range_support)
 confidence_support <- left_join(confidence_support, parsed_ranges, by = "range_support")
 
+# --- Resolve species groups, falling back to genus names ---
 if (nzchar(species_groups_file)) {
   species_groups <- read_csv_checked(species_groups_file, colClasses = "character")
   ensure_columns(species_groups, c("genus_species", "species_group"), "Species groups file")
@@ -465,6 +506,8 @@ if (nzchar(species_groups_file)) {
 
 species_groups$genus_species <- as.character(species_groups$genus_species)
 species_groups$species_group <- as.character(species_groups$species_group)
+species_groups$species_group[is.na(species_groups$species_group) |
+  trimws(species_groups$species_group) %in% c("", "NA")] <- NA_character_
 
 if (anyDuplicated(species_groups$genus_species) > 0) {
   duplicated_species <- unique(species_groups$genus_species[duplicated(species_groups$genus_species)])
@@ -488,10 +531,12 @@ ids <- left_join(ids, species_groups, by = c("identification" = "genus_species")
 
 if (any(is.na(ids$species_group))) {
   missing_species <- sort(unique(ids$identification[is.na(ids$species_group)]))
-  warn_user(
-    "Species group assignments are missing for: %s. Falling back to 'Unassigned'.",
-    paste(missing_species, collapse = ", ")
-  )
+  if (nzchar(species_groups_file)) {
+    warn_user(
+      "Species group assignments are missing for reference species: %s. Falling back to 'Unassigned'.",
+      paste(missing_species, collapse = ", ")
+    )
+  }
   ids$species_group <- ifelse(is.na(ids$species_group), "Unassigned", ids$species_group)
 }
 
@@ -510,6 +555,7 @@ if (length(query_names) > 1) {
 
 cat(sprintf("Genes before alignment filtering: %d\n", dplyr::n_distinct(ids$gene)))
 
+# --- Apply alignment thresholds and handle an empty parliament ---
 filtered_ids <- ids %>%
   filter(
     pident >= filtering_thresholds$min_similarity[[1]],
@@ -538,7 +584,11 @@ if (nrow(filtered_ids) == 0) {
   quit(save = "no", status = 1)
 }
 
+# --- Compute parliament size and rank species by supporting genes ---
 parliament_size <- dplyr::n_distinct(filtered_ids$gene)
+# FAILED_1 denotes no genes after performance filtering (handled in identify.sh).
+# FAILED_2 denotes no usable BLAST/alignment evidence; FAILED_3 denotes too few
+# voting genes. A small parliament retains identifications but suppresses confidence.
 parliament_size_check <- ifelse(
   parliament_size >= filtering_thresholds$min_parliament_size[[1]],
   "PASSED",
@@ -555,6 +605,7 @@ gene_parliament <- filtered_ids %>%
     parliament_size_check = parliament_size_check
   )
 
+# Equal vote counts share a rank; use reproducible random ordering within ties.
 set.seed(42)
 gene_parliament <- gene_parliament %>%
   mutate(
@@ -569,6 +620,7 @@ if (identical(parliament_size_check, "FAILED_3")) {
 
 top_id <- gene_parliament %>% filter(rank == 1)
 
+# --- Attach calibrated confidence only to top-ranked identifications ---
 matched_confidence_index <- vapply(
   top_id$support_identification_pct,
   find_matching_range,
@@ -592,6 +644,7 @@ top_id_confidence_support <- top_id %>%
       NA_real_,
       confidence_support$probability_correct[confidence_row]
     ),
+    # The support CSV already contains correct + close; do not add correct again.
     probability_close = ifelse(
       is.na(confidence_row),
       NA_real_,
@@ -624,6 +677,7 @@ top_id_confidence_support <- top_id_confidence_support %>%
   ) %>%
   distinct()
 
+# --- Assemble the final identification table ---
 gene_parliament_support <- left_join(
   gene_parliament %>%
     select(
@@ -655,6 +709,7 @@ gene_parliament_support <- left_join(
     ID_wrong_pct = probability_wrong
   )
 
+# --- Write the requested CSV table ---
 if (output_requested("csv")) {
   write.table(
     gene_parliament_support,
@@ -666,6 +721,7 @@ if (output_requested("csv")) {
   )
 }
 
+# --- Prepare the top-ten identification plot ---
 gene_parliament_top10 <- gene_parliament %>%
   slice_head(n = 10) %>%
   arrange(support_identification_pct, desc(identification)) %>%
@@ -679,7 +735,7 @@ gene_parliament_top10 <- gene_parliament %>%
       species_group_label,
       "), ",
       support_identification_count,
-      " genes (",
+      ifelse(support_identification_count == 1, " gene (", " genes ("),
       round(support_identification_pct, 1),
       "%)"
     ),
@@ -711,7 +767,8 @@ parliament_plot <- ggplot(gene_parliament_top10, aes(x = identification_label, y
     x = NULL,
     y = "Percentage of genes supporting identification",
     title = paste0("Identification of sample: ", sample_name),
-    subtitle = paste0("Parliament size: ", parliament_size, " genes")
+    subtitle = paste0("Parliament size: ", parliament_size,
+                     ifelse(parliament_size == 1, " gene", " genes"))
   ) +
   theme(
     panel.grid.major = element_blank(),
@@ -723,6 +780,7 @@ parliament_plot <- ggplot(gene_parliament_top10, aes(x = identification_label, y
     plot.margin = margin(5, max_chars * 4, 5, 5)
   )
 
+# --- Save requested figure formats ---
 if (output_requested("pdf")) {
   safe_ggsave(output_path(paste0(sample_name, "_gpid.pdf")), parliament_plot)
 }

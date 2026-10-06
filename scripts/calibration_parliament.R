@@ -1,9 +1,12 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Apply alignment and gene filters, then assess the minimum number of supporting genes.
 
+# --- Read paths and initialize output locations ---
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 6) {
-  stop("Usage: calibration_parliament.R <prepared_input.rds> <alignment_thresholds.tsv> <gene_threshold.tsv> <output_dir> <test_output_dir> <threshold_template.csv>", call. = FALSE)
+if (length(args) != 5) {
+  stop("Usage: calibration_parliament.R <prepared_input.rds> <alignment_thresholds.tsv> <gene_threshold.tsv> <output_dir> <test_output_dir>", call. = FALSE)
 }
 
 prepared_input <- args[[1]]
@@ -11,7 +14,6 @@ alignment_file <- args[[2]]
 gene_file <- args[[3]]
 output_dir <- args[[4]]
 test_output_dir <- args[[5]]
-template_file <- args[[6]]
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -27,6 +29,8 @@ parliament_size_csv <- file.path(test_output_dir, "calibration_parliament_size.c
 parliament_size_pdf <- file.path(test_output_dir, "calibration_parliament_size.pdf")
 parliament_thresholds_tsv <- file.path(manual_input_dir, "calibration_parliament.tsv")
 
+# --- Validate alignment and gene selections ---
+# validate_alignment_thresholds(): Read the six alignment selections from TSV and reject missing, invalid, or out-of-range values.
 validate_alignment_thresholds <- function(file) {
   message("Step 1/7: Loading and checking alignment filtering thresholds.")
   expected <- c("min_similarity", "min_length", "max_gapopens", "max_mismatches", "max_evalue", "min_bitscore")
@@ -88,6 +92,7 @@ validate_alignment_thresholds <- function(file) {
   as.list(values)
 }
 
+# validate_gene_threshold(): Read and validate the single minimum gene-performance threshold.
 validate_gene_threshold <- function(file) {
   message("Step 2/7: Loading and checking gene performance threshold.")
   thresholds <- read.delim(file, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE, strip.white = TRUE, blank.lines.skip = TRUE)
@@ -119,9 +124,11 @@ validate_gene_threshold <- function(file) {
 
 thresholds <- validate_alignment_thresholds(alignment_file)
 gene_performance_threshold <- validate_gene_threshold(gene_file)
+# --- Step 3/7: Loading prepared calibration data. ---
 message("Step 3/7: Loading prepared calibration data.")
 ids <- readRDS(prepared_input)
 
+# --- Step 4/7: Applying alignment filters. ---
 message("Step 4/7: Applying alignment filters.")
 filtered_ids <- ids %>%
   filter(
@@ -133,6 +140,7 @@ filtered_ids <- ids %>%
     bitscore >= thresholds$min_bitscore
   )
 
+# summarise_threshold(): Compute top-identification correctness and sample retrievability after applying a candidate threshold.
 summarise_threshold <- function(data, threshold) {
   data %>%
     group_by(query, target_sp, id_correct_close, query_samples) %>%
@@ -157,6 +165,7 @@ summarise_threshold <- function(data, threshold) {
     mutate(threshold = threshold)
 }
 
+# --- Step 5/7: Applying gene performance filter. ---
 message("Step 5/7: Applying gene performance filter.")
 ids_with_gene_performance <- filtered_ids %>%
   group_by(gene) %>%
@@ -168,27 +177,24 @@ ids_with_gene_performance <- filtered_ids %>%
   ungroup() %>%
   filter(gene_proportion_correct_postfiltering >= gene_performance_threshold)
 
+# --- Step 6/7: Assessing minimum parliament size thresholds. ---
 message("Step 6/7: Assessing minimum parliament size thresholds.")
+# Callback: Recompute accuracy and retrievability for each minimum parliament size.
 parliament_size_df <- bind_rows(lapply(seq(0, 1000, 1), function(i) {
   summarise_threshold(ids_with_gene_performance, i)
 }))
 
-parliament_size_plot <- ggplot(parliament_size_df) +
-  geom_line(aes(x = threshold, y = proportion_correct * 100), linewidth = 0.5) +
-  geom_line(aes(x = threshold, y = retrievability_all * 100), linewidth = 0.5, linetype = "dashed") +
-  scale_x_continuous(breaks = seq(0, 1000, 50)) +
-  scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), name = "Accuracy (%)", sec.axis = dup_axis(name = "Retrievability (%)")) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank(), legend.key.width = unit(3, "line")) +
-  labs(x = "Min. parliament size (n genes)")
+script_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1]])
+source(file.path(dirname(script_file), "calibration_plots.R"))
+source(file.path(dirname(script_file), "calibration_parameters.R"))
+parliament_size_plot <- calibration_plot(parliament_size_df, "Min. parliament size (n genes)")
 
 write.csv(parliament_size_df, parliament_size_csv, row.names = FALSE)
 ggsave(parliament_size_pdf, parliament_size_plot, width = 8, height = 4)
 
+# --- Step 7/7: Writing editable parliament size threshold TSV. ---
 message("Step 7/7: Writing editable parliament size threshold TSV.")
-template <- read.csv(template_file, stringsAsFactors = FALSE, check.names = FALSE)
-parliament_template <- data.frame(parameter = "min_parliament_size", value = NA, stringsAsFactors = FALSE)
-parliament_template <- parliament_template[parliament_template$parameter %in% names(template), , drop = FALSE]
+parliament_template <- calibration_threshold_rows("min_parliament_size")
 write.table(parliament_template, parliament_thresholds_tsv, sep = "\t", row.names = FALSE, quote = FALSE, na = "NA")
 
 message("Output files written:")

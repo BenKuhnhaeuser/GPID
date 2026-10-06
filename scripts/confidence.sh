@@ -1,7 +1,9 @@
 #!/bin/bash
+# --- Purpose ---
+# Confidence CLI: prepare known samples, assess support bins, and export confidence estimates.
 
 #################################################################
-# GeneParliamentID method validation                            #
+# GeneParliamentID confidence estimation                            #
 # Benedikt Kuhnhaeuser                                          #
 # Royal Botanic Gardens, Kew                                    #
 # 2026                                                          #
@@ -9,6 +11,7 @@
 
 set -euo pipefail
 
+# --- Installation paths, workflow defaults, and shared state ---
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SCRIPTS_DIR="$SCRIPT_DIR"
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -18,115 +21,131 @@ if [ -z "${GPID_VERSION:-}" ] && [ -f "$VERSION_FILE" ]; then
     GPID_VERSION=${GPID_VERSION%$'\r'}
 fi
 GPID_VERSION="${GPID_VERSION:-unknown}"
-OUTPUT_DIR="validation"
+OUTPUT_DIR="confidence"
 PREPARATIONS_DIR="$OUTPUT_DIR/preparations"
 TESTS_DIR="$OUTPUT_DIR/tests"
-DEFAULT_PREPARED_FILE="$PREPARATIONS_DIR/validation_prepared.rds"
-DEFAULT_TOP_IDS_FILE="$TESTS_DIR/validate_top_ids.rds"
+DEFAULT_PREPARED_FILE="$PREPARATIONS_DIR/confidence_prepared.rds"
+DEFAULT_TOP_IDS_FILE="$TESTS_DIR/confidence_top_ids.rds"
 
 declare -A REFERENCE_GENE_FILES=()
-declare -A VALIDATION_GENE_FILES=()
+declare -A CONFIDENCE_GENE_FILES=()
 
+# usage(): Print command usage, supported options, and output locations.
 usage() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid validate <command> [arguments]
+Usage: gpid confidence <command> [arguments]
 
 Commands:
-  prepare       Prepare BLAST and R input data for validation
-  confidence    Estimate validation confidence for different support bins
-  bins          Save validation confidence support probabilities for selected bins
+  prepare       Prepare BLAST and R input data for confidence
+  estimate      Estimate confidence for different support bins
+  bins          Save confidence support probabilities for selected bins
+  help          Show this help message
+
+Use gpid confidence <command> -h for command-specific help.
 
 Examples:
-  gpid validate prepare -r reference -i validation_samples
-  gpid validate confidence -i validation/preparations/validation_prepared.rds -g calibration/calibration_gene_performance.csv -t calibration/calibration_filtering_thresholds.csv
-  gpid validate bins -b 5
-
-Calibration inputs normally produced before validation:
-  -g  calibration/calibration_gene_performance.csv
-      Gene performance file with columns gene,performance
-  -t  calibration/calibration_filtering_thresholds.csv
-      Filtering thresholds file produced by gpid calibrate combine
+  gpid confidence prepare -r reference -i confidence_samples
+  gpid confidence estimate -g gene_performance.csv -t thresholds_filtering.csv
+  gpid confidence bins -b 5
 EOF
 }
 
+# usage_prepare(): Print confidence preparation inputs, grouping options, and outputs.
 usage_prepare() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid validate prepare -r <reference directory> -i <validation dataset directory> [-s <species groups file>]
+Usage: gpid confidence prepare -r <reference directory> -i <confidence dataset directory> [-s <species groups file>]
 
 Required:
-  -r  Reference dataset directory containing one FASTA file per gene and BLAST databases
-  -i  Validation dataset directory containing one FASTA file per gene
+  -r  Reference dataset directory containing one FASTA file per gene
+      Missing BLAST databases are built automatically.
+  -i  Confidence dataset directory containing one FASTA file per gene
 
 Optional:
   -s  Species groups CSV with header genus_species,species_group
       If omitted, species groups are derived from genus names.
+  -h  Show this help message
 
-Default outputs:
-  validation/preparations/validation_blast.tsv
-  validation/preparations/validation_prepared.rds
+Outputs (paths relative to the working directory):
+  confidence/preparations/confidence_blast.tsv
+  confidence/preparations/confidence_prepared.rds
 EOF
 }
 
-usage_confidence() {
+# usage_estimate(): Print confidence estimation inputs and output locations.
+usage_estimate() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid validate confidence [-i <prepared validation RDS>] -g <gene performance CSV> -t <filtering thresholds CSV>
+Usage: gpid confidence estimate [-i <prepared confidence RDS>] -g <gene performance CSV> -t <filtering thresholds CSV>
 
 Required:
-  -g  Gene performance CSV produced by calibration
-      Normally saved as: calibration/calibration_gene_performance.csv
-  -t  Filtering thresholds CSV produced by gpid calibrate combine
-      Normally saved as: calibration/calibration_filtering_thresholds.csv
+  -g  Gene performance CSV produced by gpid calibrate genes
+      Normally saved as: gene_performance.csv
+      Unique gene and performance columns are required; extra columns are allowed.
+      NA performance is treated as 0 for filtering, with a warning.
+  -t  Filtering thresholds CSV from gpid calibrate combine (parameter,value or legacy single-row format)
+      Normally saved as: thresholds_filtering.csv
 
 Optional:
-  -i  Intermediate RDS produced by gpid validate prepare
-      Default: validation/preparations/validation_prepared.rds
+  -i  Intermediate RDS produced by gpid confidence prepare
+      Default: confidence/preparations/confidence_prepared.rds
+  -h  Show this help message
 
-Default outputs:
-  validation/tests/validate_confidence.pdf
-  validation/tests/validate_top_ids.rds
+Outputs (paths relative to the working directory):
+  confidence/tests/confidence_estimate.pdf
+  confidence/tests/confidence_top_ids.rds
 EOF
 }
 
+# usage_bins(): Print confidence bin options and explain CSV versus plot semantics.
 usage_bins() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid validate bins -b <number of bins> [-i <validate top IDs RDS>]
+Usage: gpid confidence bins -b <number of bins> [-i <confidence top IDs RDS>]
 
 Required:
-  -b  Number of confidence support bins to use
+  -b  Number of confidence support bins (integer from 1 to 100)
 
 Optional:
-  -i  Top IDs RDS produced by gpid validate confidence
-      Default: validation/tests/validate_top_ids.rds
+  -i  Top IDs RDS produced by gpid confidence estimate
+      Default: confidence/tests/confidence_top_ids.rds
+  -h  Show this help message
 
-Default output:
-  validation/validation_confidence_support.csv
-  validation/validation_confidence_support.pdf
+Outputs (paths relative to the working directory):
+  confidence_support.csv
+  confidence/confidence_support.pdf
+
+In the CSV, probability_close includes correct and close identifications.
+The plot shows correct, close and wrong as separate categories.
 EOF
 }
 
+# --- Shared logging and input helpers ---
+# log(): Write a progress or result message to standard output.
 log() {
     printf '%s\n' "$1"
 }
 
+# warn(): Write a nonfatal warning to standard error.
 warn() {
     printf 'Warning: %s\n' "$1" >&2
 }
 
+# die(): Report a fatal error and terminate the shell workflow.
 die() {
     printf 'Error: %s\n' "$1" >&2
     exit 1
 }
 
+# trim_cr(): Remove a trailing carriage return from a Windows-format input line.
 trim_cr() {
     local value="$1"
     value=${value%$'\r'}
     printf '%s' "$value"
 }
 
+# gene_name_from_path(): Derive the gene key from a FASTA basename, ignoring extension case.
 gene_name_from_path() {
     local file_name
     file_name=$(basename "$1")
@@ -138,6 +157,7 @@ gene_name_from_path() {
     esac
 }
 
+# collect_gene_files(): Populate the named associative array with gene-to-FASTA paths; reject duplicate gene keys.
 collect_gene_files() {
     local dir="$1"
     local target="$2"
@@ -177,6 +197,7 @@ collect_gene_files() {
     return 0
 }
 
+# validate_multi_sequence_fasta(): Check multi-sample FASTA records for sequence data, unique names, and species-formatted headers.
 validate_multi_sequence_fasta() {
     local fasta_file="$1"
     local context="$2"
@@ -255,11 +276,13 @@ validate_multi_sequence_fasta() {
     return "$file_failed"
 }
 
+# require_file(): Fail early if the required input file does not exist.
 require_file() {
     local file="$1"
     [ -f "$file" ] || die "File not found: $file"
 }
 
+# require_csv_extension(): Reject input paths without the expected CSV filename extension.
 require_csv_extension() {
     local file="$1"
     if [[ "${file##*.}" != "csv" && "${file##*.}" != "CSV" ]]; then
@@ -267,6 +290,7 @@ require_csv_extension() {
     fi
 }
 
+# validate_csv_has_commas(): Reject files whose header does not look comma-separated.
 validate_csv_has_commas() {
     local file="$1"
     local header=""
@@ -275,130 +299,45 @@ validate_csv_has_commas() {
     [[ "$header" == *,* ]] || die "CSV file does not appear to be comma-separated: $file"
 }
 
+# validate_gene_performance_file(): Run the shared AWK CSV checker, preserving NA warnings and detailed errors.
 validate_gene_performance_file() {
     local file="$1"
-    local status=0
-
-    require_file "$file"
+    [ -r "$file" ] || die "Gene performance file is missing or unreadable: $file"
     require_csv_extension "$file"
-    validate_csv_has_commas "$file"
-
-    if awk -F',' '
-        BEGIN { found = 0 }
-        NF {
-            gsub(/\r$/, "", $0)
-            if (found == 0) {
-                if (NF != 2 || $1 != "gene" || $2 != "performance") {
-                    exit 10
-                }
-                found = 1
-                next
-            }
-
-            if (NF != 2 || $1 == "" || $2 == "" || $2 !~ /^[0-9]+([.][0-9]+)?$/) {
-                exit 11
-            }
-
-            if (($2 + 0) < 0 || ($2 + 0) > 100) {
-                exit 12
-            }
-        }
-        END {
-            if (found == 0) {
-                exit 13
-            }
-            if (found == 1 && NR == 1) {
-                exit 14
-            }
-        }
-    ' "$file"; then
-        status=0
+    if LC_ALL=C awk -f "$SCRIPT_DIR/gene_performance.awk" "$file"; then
+        log "Gene performance calibration file format check passed."
     else
-        status=$?
+        die "Gene performance file check failed: $file"
     fi
-
-    case $status in
-        0) log "Gene performance calibration file format check passed." ;;
-        10) die "Gene performance file must be a comma-separated CSV with header 'gene,performance': $file" ;;
-        11) die "Gene performance file must contain two columns: gene name and numeric percentage performance: $file" ;;
-        12) die "Gene performance values must be between 0 and 100: $file" ;;
-        13) die "Gene performance file is empty: $file" ;;
-        14) die "Gene performance file must contain at least one gene performance row: $file" ;;
-        *) die "Unable to validate gene performance file: $file" ;;
-    esac
 }
 
+# validate_thresholds_file(): Validate the eight-parameter filtering CSV before downstream filtering.
 validate_thresholds_file() {
     local file="$1"
-    local expected_header="min_similarity,min_length,max_gapopens,max_mismatches,max_evalue,min_bitscore,min_gene_performance,min_parliament_size"
     local status=0
 
-    require_file "$file"
+    [ -f "$file" ] || die "File not found: $file"
     require_csv_extension "$file"
-    validate_csv_has_commas "$file"
-
-    if awk -F',' -v expected_header="$expected_header" '
-        BEGIN {
-            row = 0
-            split("0 0 0 0 0 0 0 0", mins, " ")
-            split("100 99999 99999 99999 100 99999 100 99999", maxs, " ")
-        }
-        NF {
-            gsub(/\r$/, "", $0)
-            row++
-
-            if (row == 1) {
-                if ($0 != expected_header) {
-                    exit 10
-                }
-                next
-            }
-
-            if (row == 2) {
-                if (NF != 8) {
-                    exit 11
-                }
-
-                for (i = 1; i <= NF; i++) {
-                    if ($i == "" || $i == "NA" || $i !~ /^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/) {
-                        exit 12
-                    }
-                    if (($i + 0) < mins[i] || ($i + 0) > maxs[i]) {
-                        exit 13
-                    }
-                }
-                next
-            }
-
-            exit 14
-        }
-        END {
-            if (row == 0) {
-                exit 15
-            }
-            if (row == 1) {
-                exit 16
-            }
-        }
-    ' "$file"; then
+    if LC_ALL=C awk -v enforce_ranges=1 -f "$SCRIPT_DIR/filtering_thresholds.awk" "$file"; then
         status=0
     else
         status=$?
     fi
-
     case $status in
         0) log "Filtering thresholds calibration file format check passed." ;;
-        10) die "Filtering thresholds file must use the template header '$expected_header': $file" ;;
-        11) die "Filtering thresholds file must contain exactly eight threshold values in the second row: $file" ;;
-        12) die "All filtering threshold values need to be specified as numeric values before this file can be used: $file" ;;
-        13) die "Filtering thresholds file contains a value outside the allowed range: $file" ;;
-        14) die "Filtering thresholds file must contain only a header row and one row of thresholds: $file" ;;
-        15) die "Filtering thresholds file is empty: $file" ;;
-        16) die "Filtering thresholds file is missing the thresholds row: $file" ;;
+        10) die "Filtering thresholds file must use parameter,value columns or the eight parameter names followed by one value row: $file" ;;
+        11) die "Filtering thresholds file row width does not match its header: $file" ;;
+        12) die "Filtering thresholds file contains an unexpected parameter: $file" ;;
+        13) die "Filtering thresholds file contains a duplicated parameter: $file" ;;
+        14) die "Filtering thresholds file contains a missing or non-numeric threshold value: $file" ;;
+        15) die "Filtering thresholds file must contain each of the eight required parameters exactly once: $file" ;;
+        16) die "Filtering thresholds file contains a value outside the allowed range: $file" ;;
+        17) die "Legacy filtering thresholds file must contain exactly one value row: $file" ;;
         *) die "Unable to validate filtering thresholds file: $file" ;;
     esac
 }
 
+# validate_bins_value(): Require an integer confidence bin count between 1 and 100.
 validate_bins_value() {
     local bins="$1"
 
@@ -407,17 +346,19 @@ validate_bins_value() {
     [ "$bins" -le 100 ] || die "Bins must be at most 100."
 }
 
+# --- Confidence workflow commands ---
+# run_prepare(): Prepare references and confidence BLAST matches, then label matches using species groups or genera.
 run_prepare() {
     local reference_dir=""
-    local validation_dir=""
+    local confidence_dir=""
     local species_groups_file=""
-    local validation_failed=0
+    local input_checks_failed=0
     local matched_genes=()
     local missing_reference_genes=()
     local gene=""
     local sample_count=0
-    local blast_file="$PREPARATIONS_DIR/validation_blast.tsv"
-    local prepared_file="$PREPARATIONS_DIR/validation_prepared.rds"
+    local blast_file="$PREPARATIONS_DIR/confidence_blast.tsv"
+    local prepared_file="$PREPARATIONS_DIR/confidence_prepared.rds"
 
     if [ "$#" -eq 0 ]; then
         usage_prepare
@@ -427,7 +368,7 @@ run_prepare() {
     while getopts ":r:i:s:h" opt; do
         case "$opt" in
             r) reference_dir="$OPTARG" ;;
-            i) validation_dir="$OPTARG" ;;
+            i) confidence_dir="$OPTARG" ;;
             s) species_groups_file="$OPTARG" ;;
             h)
                 usage_prepare
@@ -443,69 +384,69 @@ run_prepare() {
     done
 
     [ -n "$reference_dir" ] || die "Reference directory is required. Use -r <reference directory>."
-    [ -n "$validation_dir" ] || die "Validation dataset directory is required. Use -i <validation dataset directory>."
+    [ -n "$confidence_dir" ] || die "Confidence dataset directory is required. Use -i <confidence dataset directory>."
     [ -d "$reference_dir" ] || die "Reference directory not found: $reference_dir"
-    [ -d "$validation_dir" ] || die "Validation dataset directory not found: $validation_dir"
+    [ -d "$confidence_dir" ] || die "Confidence dataset directory not found: $confidence_dir"
     [ -z "$species_groups_file" ] || require_file "$species_groups_file"
 
     reference_dir=${reference_dir%/}
-    validation_dir=${validation_dir%/}
+    confidence_dir=${confidence_dir%/}
 
     log "Checking and preparing reference dataset..."
     bash "$SCRIPTS_DIR/reference.sh" -r "$reference_dir"
 
     collect_gene_files "$reference_dir" REFERENCE_GENE_FILES || die "No FASTA gene files found in reference directory. Expected files ending in .FNA, .fasta or .fa."
-    collect_gene_files "$validation_dir" VALIDATION_GENE_FILES || die "No FASTA gene files found in validation dataset directory. Expected files ending in .FNA, .fasta or .fa."
+    collect_gene_files "$confidence_dir" CONFIDENCE_GENE_FILES || die "No FASTA gene files found in confidence dataset directory. Expected files ending in .FNA, .fasta or .fa."
 
-    log "Checking validation dataset..."
-    for gene in "${!VALIDATION_GENE_FILES[@]}"; do
-        log "Checking $(basename "${VALIDATION_GENE_FILES[$gene]}")"
-        if ! validate_multi_sequence_fasta "${VALIDATION_GENE_FILES[$gene]}" "validation"; then
-            validation_failed=1
+    log "Checking confidence dataset..."
+    for gene in "${!CONFIDENCE_GENE_FILES[@]}"; do
+        log "Checking $(basename "${CONFIDENCE_GENE_FILES[$gene]}")"
+        if ! validate_multi_sequence_fasta "${CONFIDENCE_GENE_FILES[$gene]}" "confidence"; then
+            input_checks_failed=1
         fi
     done
 
-    if [ "$validation_failed" -ne 0 ]; then
-        die "Validation dataset validation failed. Please fix the FASTA files and run the script again."
+    if [ "$input_checks_failed" -ne 0 ]; then
+        die "Confidence dataset checks failed. Please fix the FASTA files and run the script again."
     fi
 
-    for gene in "${!VALIDATION_GENE_FILES[@]}"; do
+    for gene in "${!CONFIDENCE_GENE_FILES[@]}"; do
         if [ -n "${REFERENCE_GENE_FILES[$gene]+x}" ]; then
             matched_genes+=( "$gene" )
         else
             missing_reference_genes+=( "$gene" )
-            warn "Gene found in the validation dataset but not in the reference dataset: $gene"
+            warn "Gene found in the confidence dataset but not in the reference dataset: $gene"
         fi
     done
 
     if [ "${#matched_genes[@]}" -eq 0 ]; then
-        die "None of the genes in the validation dataset were found in the reference dataset."
+        die "None of the genes in the confidence dataset were found in the reference dataset."
     fi
 
     if [ "${#missing_reference_genes[@]}" -eq 0 ]; then
-        log "All validation gene names were found in the reference dataset."
+        log "All confidence gene names were found in the reference dataset."
     fi
 
     sample_count=$(
         for gene in "${matched_genes[@]}"; do
-            awk '/^>/ { sub(/^>/, "", $0); gsub(/\r$/, "", $0); print }' "${VALIDATION_GENE_FILES[$gene]}"
+            awk '/^>/ { sub(/^>/, "", $0); gsub(/\r$/, "", $0); print }' "${CONFIDENCE_GENE_FILES[$gene]}"
         done | sort -u | awk 'NF { count++ } END { print count + 0 }'
     )
 
-    log "Number of samples being used for validation: $sample_count"
+    log "Number of samples being used for confidence: $sample_count"
 
     mkdir -p "$PREPARATIONS_DIR"
     command -v blastn >/dev/null 2>&1 || die "blastn command not found in PATH."
     command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
 
-    log "Matching validation genes against reference databases..."
+    log "Matching confidence genes against reference databases..."
     {
         printf 'gene\tquery\ttarget\tpident\tlength\tmismatch\tgapopen\tevalue\tbitscore\n'
         while IFS= read -r gene; do
             [ -n "$gene" ] || continue
 
             blastn \
-                -query "${VALIDATION_GENE_FILES[$gene]}" \
+                -query "${CONFIDENCE_GENE_FILES[$gene]}" \
                 -db "${REFERENCE_GENE_FILES[$gene]}" \
                 -task megablast \
                 -outfmt "6 qseqid sseqid pident length mismatch gapopen evalue bitscore" \
@@ -516,27 +457,25 @@ run_prepare() {
         done < <(printf '%s\n' "${matched_genes[@]}" | sort)
     } > "$blast_file"
 
-    log "BLAST validation file written:"
+    log "BLAST confidence file written:"
     log "$blast_file"
 
-    log "Preparing validation data for downstream R analyses..."
+    log "Preparing confidence data for downstream R analyses..."
     if [ -n "$species_groups_file" ]; then
-        Rscript "$SCRIPTS_DIR/validation_preparations.R" "$blast_file" "$prepared_file" "$species_groups_file"
+        Rscript "$SCRIPTS_DIR/confidence_preparations.R" "$blast_file" "$prepared_file" "$species_groups_file" "$reference_dir"
     else
-        Rscript "$SCRIPTS_DIR/validation_preparations.R" "$blast_file" "$prepared_file"
+        Rscript "$SCRIPTS_DIR/confidence_preparations.R" "$blast_file" "$prepared_file"
     fi
-
-    log "Prepared validation data written:"
-    log "$prepared_file"
 }
 
-run_confidence() {
+# run_estimate(): Validate calibrated inputs and launch the confidence-bin comparison in R.
+run_estimate() {
     local input_file="$DEFAULT_PREPARED_FILE"
     local gene_performance_file=""
     local thresholds_file=""
 
     if [ "$#" -eq 0 ]; then
-        usage_confidence
+        usage_estimate
         exit 1
     fi
 
@@ -546,7 +485,7 @@ run_confidence() {
             g) gene_performance_file="$OPTARG" ;;
             t) thresholds_file="$OPTARG" ;;
             h)
-                usage_confidence
+                usage_estimate
                 exit 0
                 ;;
             :)
@@ -561,7 +500,7 @@ run_confidence() {
     [ -n "$gene_performance_file" ] || die "Gene performance CSV is required. Use -g <gene performance CSV>."
     [ -n "$thresholds_file" ] || die "Filtering thresholds CSV is required. Use -t <filtering thresholds CSV>."
 
-    log "Checking validation confidence input files..."
+    log "Checking confidence input files..."
     require_file "$input_file"
     validate_gene_performance_file "$gene_performance_file"
     validate_thresholds_file "$thresholds_file"
@@ -571,16 +510,13 @@ run_confidence() {
 
     mkdir -p "$TESTS_DIR"
 
-    log "Estimating validation confidence for different support bins..."
-    Rscript "$SCRIPTS_DIR/validation_confidence.R" "$input_file" "$gene_performance_file" "$thresholds_file" "$TESTS_DIR"
-    log "Done."
-    log "Validation confidence files written:"
-    log "$TESTS_DIR/validate_confidence.pdf"
-    log "$TESTS_DIR/validate_top_ids.rds"
+    log "Estimating confidence for different support bins..."
+    Rscript "$SCRIPTS_DIR/confidence_estimate.R" "$input_file" "$gene_performance_file" "$thresholds_file" "$TESTS_DIR"
     log ""
-    log "Inspect the file validate_confidence.pdf to decide on the optimal number of bins. Specify the number of bins using gpid validate bins."
+    log "Inspect the confidence plot above, then select the number of bins with gpid confidence bins -b <number>."
 }
 
+# run_bins(): Check the chosen bin count and export confidence probabilities and the selected-bin plot.
 run_bins() {
     local input_file="$DEFAULT_TOP_IDS_FILE"
     local bins=""
@@ -613,9 +549,10 @@ run_bins() {
     command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
 
     mkdir -p "$OUTPUT_DIR"
-    Rscript "$SCRIPTS_DIR/validation_bins.R" "$input_file" "$bins" "$OUTPUT_DIR"
+    Rscript "$SCRIPTS_DIR/confidence_bins.R" "$input_file" "$bins" "$OUTPUT_DIR"
 }
 
+# --- Dispatch the confidence subcommand ---
 if [ "$#" -eq 0 ]; then
     usage
     exit 1
@@ -628,8 +565,8 @@ case "$command_name" in
     prepare)
         run_prepare "$@"
         ;;
-    confidence)
-        run_confidence "$@"
+    estimate)
+        run_estimate "$@"
         ;;
     bins)
         run_bins "$@"
@@ -638,7 +575,7 @@ case "$command_name" in
         usage
         ;;
     *)
-        printf 'Error: Unknown validation command: %s\n' "$command_name" >&2
+        printf 'Error: Unknown confidence command: %s\n' "$command_name" >&2
         usage >&2
         exit 1
         ;;

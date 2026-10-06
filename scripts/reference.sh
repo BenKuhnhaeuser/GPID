@@ -1,4 +1,6 @@
 #!/bin/bash
+# --- Purpose ---
+# Reference workflow: check FASTA headers and build any missing BLAST databases.
 
 #################################################################
 # Reference directory preparation                               #
@@ -9,6 +11,7 @@
 
 set -euo pipefail
 
+# --- Installation paths and version ---
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 VERSION_FILE="${GPID_VERSION_FILE:-$PROJECT_DIR/VERSION}"
@@ -18,36 +21,44 @@ if [ -z "${GPID_VERSION:-}" ] && [ -f "$VERSION_FILE" ]; then
 fi
 GPID_VERSION="${GPID_VERSION:-unknown}"
 
+# usage(): Print command usage, supported options, and output locations.
 usage() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
 Usage: gpid reference -r <reference directory>
 
-Prepare a reference directory by:
-  1. locating FASTA files (.FNA, .fasta, .fa)
-  2. validating FASTA header format
-  3. checking whether BLAST databases already exist
-  4. building missing BLAST databases with makeblastdb
+Check reference FASTA files and build missing BLAST databases with makeblastdb.
 
-Options:
-  -r  Path to the reference directory
+Required:
+  -r  Reference directory containing FASTA files (.fna, .fasta, .fa; case-insensitive)
+      Headers must start with Genus_species, contain no whitespace, and be unique
+      within each file. Maximum header length: 50 characters, excluding >.
+
+Optional:
   -h  Show this help message
+
+Outputs:
+  BLAST database files beside each reference FASTA file; existing databases are reused.
 EOF
 }
 
+# log(): Write a progress or result message to standard output.
 log() {
     printf '%s\n' "$1"
 }
 
+# warn(): Write a nonfatal warning to standard error.
 warn() {
     printf 'Warning: %s\n' "$1" >&2
 }
 
+# die(): Report a fatal error and terminate the shell workflow.
 die() {
     printf 'Error: %s\n' "$1" >&2
     exit 1
 }
 
+# --- Parse CLI arguments and check the reference directory ---
 reference_dir=""
 
 if [ "$#" -eq 0 ]; then
@@ -76,6 +87,7 @@ done
 
 reference_dir=${reference_dir%/}
 
+# --- Expected BLAST database components ---
 BLAST_SUFFIXES=(
     ".ndb"
     ".nhr"
@@ -91,6 +103,7 @@ BLAST_SUFFIXES=(
 
 FASTA_FILES=()
 
+# collect_fasta_files(): Collect supported FASTA extensions case-insensitively without duplicate paths.
 collect_fasta_files() {
     local dir="$1"
     local matches=()
@@ -106,6 +119,7 @@ collect_fasta_files() {
     mapfile -t FASTA_FILES < <(printf '%s\n' "${matches[@]}" | awk '!seen[$0]++' | sort)
 }
 
+# blast_db_complete(): Return success only when every expected BLAST database component exists.
 blast_db_complete() {
     local fasta_file="$1"
     local suffix=""
@@ -119,6 +133,7 @@ blast_db_complete() {
     return 0
 }
 
+# validate_fasta_file(): Check reference FASTA records, unique species-prefixed names, and the 50-character header limit.
 validate_fasta_file() {
     local fasta_file="$1"
     local line=""
@@ -143,6 +158,11 @@ validate_fasta_file() {
                 printf 'Error: %s:%s contains an empty FASTA header.\n' "$fasta_file" "$line_number" >&2
                 file_failed=1
                 continue
+            fi
+
+            if [ "${#header}" -gt 50 ]; then
+                printf 'Error: FASTA header in %s:%s is %s characters long; the maximum for BLAST reference databases is 50 characters (excluding >). Shorten this header: %s\n' "$fasta_file" "$line_number" "${#header}" "$header" >&2
+                file_failed=1
             fi
 
             if [ -n "${seen_headers[$header]+x}" ]; then
@@ -188,6 +208,7 @@ validate_fasta_file() {
     return "$file_failed"
 }
 
+# --- Run reference checks and build missing databases ---
 log "This script prepares a reference directory for GPID by validating reference FASTA files and building any missing BLAST databases."
 log "Step 1/4: Checking for FASTA files in $reference_dir"
 

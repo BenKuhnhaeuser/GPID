@@ -1,15 +1,17 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Assess six alignment thresholds and write their diagnostic curves and editable threshold TSV.
 
+# --- Read paths and initialize output locations ---
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 4) {
-  stop("Usage: calibration_alignments.R <prepared_input.rds> <output_dir> <test_output_dir> <threshold_template.csv>", call. = FALSE)
+if (length(args) != 3) {
+  stop("Usage: calibration_alignments.R <prepared_input.rds> <output_dir> <test_output_dir>", call. = FALSE)
 }
 
 prepared_input <- args[[1]]
 output_dir <- args[[2]]
 test_output_dir <- args[[3]]
-template_file <- args[[4]]
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -39,6 +41,8 @@ alignment_bitscore_pdf <- file.path(test_output_dir, "calibration_alignments_bit
 alignment_composite_pdf <- file.path(test_output_dir, "calibration_alignments_thresholds_composite.pdf")
 alignment_thresholds_tsv <- file.path(manual_input_dir, "calibration_alignments.tsv")
 
+# --- Performance summaries and shared plot construction ---
+# summarise_threshold(): Compute top-identification correctness and sample retrievability after applying a candidate threshold.
 summarise_threshold <- function(data, threshold) {
   data %>%
     group_by(query, target_sp, id_correct_close, query_samples) %>%
@@ -61,57 +65,66 @@ summarise_threshold <- function(data, threshold) {
     mutate(threshold = threshold)
 }
 
+# alignment_threshold_table(): Evaluate each candidate alignment cutoff and combine its performance summary rows.
 alignment_threshold_table <- function(limits, filter_fn) {
+  # Callback: Evaluate the filter and performance summary for each candidate cutoff.
   bind_rows(lapply(limits, function(i) summarise_threshold(filter_fn(ids, i), i)))
 }
 
-alignment_plot <- function(df, x_label, breaks = waiver(), trans = "identity") {
-  ggplot(df) +
-    geom_line(aes(x = threshold, y = proportion_correct * 100), linewidth = 0.5) +
-    geom_line(aes(x = threshold, y = retrievability_all * 100), linewidth = 0.5, linetype = "dashed") +
-    scale_x_continuous(breaks = breaks, trans = trans) +
-    scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), name = "Accuracy (%)", sec.axis = dup_axis(name = "Retrievability (%)")) +
-    theme_bw(base_size = 14) +
-    theme(panel.grid = element_blank(), legend.key.width = unit(3, "line")) +
-    labs(x = x_label)
-}
+script_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1]])
+source(file.path(dirname(script_file), "calibration_plots.R"))
+source(file.path(dirname(script_file), "calibration_parameters.R"))
+alignment_plot <- calibration_plot
 
+# --- Step 1/8: Assessing minimum alignment similarity thresholds. ---
 message("Step 1/8: Assessing minimum alignment similarity thresholds.")
+# Callback: Keep alignments meeting each candidate minimum percentage similarity.
 alignment_similarity_df <- alignment_threshold_table(seq(50, 100, 1), function(data, i) filter(data, pident >= i))
-alignment_similarity_plot <- alignment_plot(alignment_similarity_df, "Min. alignment similarity (%)", seq(0, 100, 10))
+alignment_similarity_plot <- alignment_plot(alignment_similarity_df, "Min. alignment similarity (%)")
 write.csv(alignment_similarity_df, alignment_similarity_csv, row.names = FALSE)
 ggsave(alignment_similarity_pdf, alignment_similarity_plot, width = 8, height = 4)
 
+# --- Step 2/8: Assessing minimum alignment length thresholds. ---
 message("Step 2/8: Assessing minimum alignment length thresholds.")
+# Callback: Keep alignments meeting each candidate minimum aligned length.
 alignment_length_df <- alignment_threshold_table(seq(0, 5000, 100), function(data, i) filter(data, length >= i))
-alignment_length_plot <- alignment_plot(alignment_length_df, "Min. alignment length", seq(0, 10000, 1000))
+alignment_length_plot <- alignment_plot(alignment_length_df, "Min. alignment length")
 write.csv(alignment_length_df, alignment_length_csv, row.names = FALSE)
 ggsave(alignment_length_pdf, alignment_length_plot, width = 8, height = 4)
 
+# --- Step 3/8: Assessing maximum alignment gap opening thresholds. ---
 message("Step 3/8: Assessing maximum alignment gap opening thresholds.")
+# Callback: Keep alignments at or below each candidate gap-opening limit.
 alignment_gapopens_df <- alignment_threshold_table(seq(0, 100, 1), function(data, i) filter(data, gapopen <= i))
-alignment_gapopens_plot <- alignment_plot(alignment_gapopens_df, "Max. alignment gap openings", seq(0, 100, 20))
+alignment_gapopens_plot <- alignment_plot(alignment_gapopens_df, "Max. alignment gap openings")
 write.csv(alignment_gapopens_df, alignment_gapopens_csv, row.names = FALSE)
 ggsave(alignment_gapopens_pdf, alignment_gapopens_plot, width = 8, height = 4)
 
+# --- Step 4/8: Assessing maximum alignment mismatch thresholds. ---
 message("Step 4/8: Assessing maximum alignment mismatch thresholds.")
+# Callback: Keep alignments at or below each candidate mismatch limit.
 alignment_mismatch_df <- alignment_threshold_table(seq(0, 100, 1), function(data, i) filter(data, mismatch <= i))
-alignment_mismatches_plot <- alignment_plot(alignment_mismatch_df, "Max. alignment mismatches", seq(0, 100, 20))
+alignment_mismatches_plot <- alignment_plot(alignment_mismatch_df, "Max. alignment mismatches")
 write.csv(alignment_mismatch_df, alignment_mismatches_csv, row.names = FALSE)
 ggsave(alignment_mismatches_pdf, alignment_mismatches_plot, width = 8, height = 4)
 
+# --- Step 5/8: Assessing maximum E-value thresholds. ---
 message("Step 5/8: Assessing maximum E-value thresholds.")
+# Callback: Keep alignments at or below each candidate E-value limit.
 alignment_evalue_df <- alignment_threshold_table(10^(-seq(0, 200, 10)), function(data, i) filter(data, evalue <= i))
-alignment_evalue_plot <- alignment_plot(alignment_evalue_df, "Max. E-value", 10^(-seq(0, 200, 50)), "log10")
+alignment_evalue_plot <- alignment_plot(alignment_evalue_df, "Max. E-value", trans = "log10")
 write.csv(alignment_evalue_df, alignment_evalue_csv, row.names = FALSE)
 ggsave(alignment_evalue_pdf, alignment_evalue_plot, width = 8, height = 4)
 
+# --- Step 6/8: Assessing minimum Bit-score thresholds. ---
 message("Step 6/8: Assessing minimum Bit-score thresholds.")
+# Callback: Keep alignments meeting each candidate minimum Bit-score.
 alignment_bitscore_df <- alignment_threshold_table(seq(0, 10000, 100), function(data, i) filter(data, bitscore >= i))
-alignment_bitscore_plot <- alignment_plot(alignment_bitscore_df, "Min. Bit-score", seq(0, 10000, 2000))
+alignment_bitscore_plot <- alignment_plot(alignment_bitscore_df, "Min. Bit-score")
 write.csv(alignment_bitscore_df, alignment_bitscore_csv, row.names = FALSE)
 ggsave(alignment_bitscore_pdf, alignment_bitscore_plot, width = 8, height = 4)
 
+# --- Step 7/8: Combining alignment threshold plots. ---
 message("Step 7/8: Combining alignment threshold plots.")
 composite_plot <- ggarrange(
   alignment_similarity_plot, alignment_length_plot,
@@ -119,17 +132,12 @@ composite_plot <- ggarrange(
   alignment_evalue_plot, alignment_bitscore_plot,
   nrow = 3, ncol = 2, common.legend = TRUE, legend = "bottom"
 )
-ggsave(alignment_composite_pdf, composite_plot, width = 9, height = 10)
+ggsave(alignment_composite_pdf, composite_plot, width = calibration_plot_width, height = 3 * calibration_plot_row_height)
 
+# --- Step 8/8: Writing editable alignment threshold TSV. ---
 message("Step 8/8: Writing editable alignment threshold TSV.")
-template <- read.csv(template_file, stringsAsFactors = FALSE, check.names = FALSE)
 alignment_parameters <- c("min_similarity", "min_length", "max_gapopens", "max_mismatches", "max_evalue", "min_bitscore")
-alignment_template <- data.frame(
-  parameter = alignment_parameters,
-  value = NA,
-  stringsAsFactors = FALSE
-)
-alignment_template <- alignment_template[alignment_template$parameter %in% names(template), , drop = FALSE]
+alignment_template <- calibration_threshold_rows(alignment_parameters)
 write.table(alignment_template, alignment_thresholds_tsv, sep = "\t", row.names = FALSE, quote = FALSE, na = "NA")
 
 message("Output files written:")

@@ -1,4 +1,6 @@
 #!/bin/bash
+# --- Purpose ---
+# Identification workflow: validate inputs, select genes, run BLAST, and compute the Gene Parliament.
 
 #################################################################
 # GeneParliamentID pipeline                                     #
@@ -7,8 +9,14 @@
 # 2026                                                          #
 #################################################################
 
-set -euo pipefail
+set -Eeuo pipefail
 
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
+    printf 'Error: gpid identify requires Bash 4.3 or newer (running %s).\n' "$BASH_VERSION" >&2
+    exit 1
+fi
+
+# --- Installation paths, defaults, and workflow state ---
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 VERSION_FILE="${GPID_VERSION_FILE:-$PROJECT_DIR/VERSION}"
@@ -18,9 +26,9 @@ if [ -z "${GPID_VERSION:-}" ] && [ -f "$VERSION_FILE" ]; then
 fi
 GPID_VERSION="${GPID_VERSION:-unknown}"
 
-DEFAULT_GENE_PERFORMANCE_FILE="calibration/calibration_gene_performance.csv"
-DEFAULT_THRESHOLDS_FILE="calibration/calibration_filtering_thresholds.csv"
-DEFAULT_CONFIDENCE_SUPPORT_FILE="validation/validation_confidence_support.csv"
+DEFAULT_GENE_PERFORMANCE_FILE="gene_performance.csv"
+DEFAULT_THRESHOLDS_FILE="thresholds_filtering.csv"
+DEFAULT_CONFIDENCE_SUPPORT_FILE="confidence_support.csv"
 
 BLAST_SUFFIXES=(
     ".ndb"
@@ -47,6 +55,9 @@ bypass_calibration=0
 overwrite_output_dir=0
 remove_intermediates=0
 temp_dir=""
+blast_staging_file=""
+current_step="initialisation"
+current_gene=""
 gene_performance_file_specified=0
 thresholds_file_specified=0
 confidence_support_file_specified=0
@@ -56,6 +67,7 @@ declare -A REFERENCE_GENE_FILES=()
 declare -A REFERENCE_SPECIES=()
 declare -A OUTPUT_FORMAT_SET=()
 
+# usage(): Print command usage, supported options, and output locations.
 usage() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
@@ -65,58 +77,82 @@ Required:
   -i  Sample directory containing one FASTA file per gene for the sample to identify
   -r  Reference directory containing one FASTA file per gene and the corresponding BLAST databases
 
-Calibration and validation:
-  -g  Gene performance CSV
-      If omitted, use: calibration/calibration_gene_performance.csv
-      Default file produced by: gpid calibrate genes
-  -t  Filtering thresholds CSV
-      If omitted, use: calibration/calibration_filtering_thresholds.csv
-      Default file produced by: gpid calibrate combine
-  -c  Confidence support CSV
-      If omitted, use: validation/validation_confidence_support.csv
-      Default file produced by: gpid validate bins
-
-      During a run, gpid identify prints the specified filtering thresholds
-      and the confidence support bins read from these files.
+Calibration and confidence (optional paths):
+  -g  Gene performance CSV produced by gpid calibrate genes
+      Default: gene_performance.csv
+      Unique gene and performance columns are required; extra columns are allowed.
+      NA performance is treated as 0 for filtering, with a warning.
+  -t  Filtering thresholds CSV from gpid calibrate combine (parameter,value or legacy single-row format)
+      Default: thresholds_filtering.csv
+  -c  Confidence support CSV produced by gpid confidence bins
+      Default: confidence_support.csv
 
 Optional:
-  -s  Species groups CSV
-  -o  Output directory (default: identification/<sample_name>)
+  -s  Species groups CSV with header genus_species,species_group
+      If omitted, species groups are derived from genus names.
+  -o  Output directory (default: identifications; files are named by sample)
   -f  Comma-separated output formats: csv, jpg, svg, pdf, or all (default: csv,pdf)
-  --bypass_calibration  Ignore -g/-t/-c and create dummy calibration files instead
+  --bypass_calibration  Ignore -g/-t/-c and use temporary dummy calibration files
   --overwrite_outputs  Allow existing output files in the output directory to be overwritten
   --remove_intermediates  Do not save intermediate files; only keep final output files
   -h, --help  Show this help message
+
+Outputs (inside the output directory):
+  <sample>_gpid.<format> for each requested format
+  <sample>_blast.tsv unless --remove_intermediates is used
 EOF
 }
 
+# log(): Write a progress or result message to standard output.
 log() {
     printf '%s\n' "$1"
 }
 
+# warn(): Write a nonfatal warning to standard error.
 warn() {
     printf 'Warning: %s\n' "$1" >&2
 }
 
+# die(): Report a fatal error and terminate the shell workflow.
 die() {
     printf 'Error: %s\n' "$1" >&2
     exit 1
 }
 
+# --- Failure diagnostics and temporary-file lifecycle ---
+# cleanup(): Remove temporary or incomplete files while preserving the original process exit status.
 cleanup() {
-    if [ -n "$temp_dir" ] && [ -d "$temp_dir" ]; then
-        rm -rf "$temp_dir"
+    local status=$?
+    trap - EXIT ERR
+    if [ -n "$blast_staging_file" ] && [ -f "$blast_staging_file" ]; then
+        rm -f -- "$blast_staging_file" || warn "Could not remove incomplete BLAST table: $blast_staging_file"
     fi
+    if [ -n "$temp_dir" ] && [ -d "$temp_dir" ]; then
+        rm -rf -- "$temp_dir" || warn "Could not remove temporary directory: $temp_dir"
+    fi
+    exit "$status"
+}
+
+# report_unexpected_error(): Report the failing identification step, gene, source line, command, and exit status.
+report_unexpected_error() {
+    local status="$1" line="$2" command="$3"
+    printf 'Error: Identification failed during %s (gene: %s, line: %s, exit status: %s).\n' \
+        "$current_step" "${current_gene:-none}" "$line" "$status" >&2
+    printf 'Failed command: %s\n' "$command" >&2
 }
 
 trap cleanup EXIT
+trap 'report_unexpected_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
 
+# --- FASTA, CSV, and threshold input helpers ---
+# trim_cr(): Remove a trailing carriage return from a Windows-format input line.
 trim_cr() {
     local value="$1"
     value=${value%$'\r'}
     printf '%s' "$value"
 }
 
+# gene_name_from_path(): Derive the gene key from a FASTA basename, ignoring extension case.
 gene_name_from_path() {
     local file_name
     file_name=$(basename "$1")
@@ -128,6 +164,7 @@ gene_name_from_path() {
     esac
 }
 
+# collect_gene_files(): Populate the named associative array with gene-to-FASTA paths; reject duplicate gene keys.
 collect_gene_files() {
     local dir="$1"
     local target="$2"
@@ -167,6 +204,7 @@ collect_gene_files() {
     return 0
 }
 
+# validate_single_sequence_fasta(): Check that one sample gene FASTA contains exactly one nonempty sequence record.
 validate_single_sequence_fasta() {
     local fasta_file="$1"
     local context="$2"
@@ -204,6 +242,7 @@ validate_single_sequence_fasta() {
     fi
 }
 
+# extract_reference_species(): Populate the reference-species set from FASTA header prefixes.
 extract_reference_species() {
     local fasta_file="$1"
     local line=""
@@ -223,11 +262,13 @@ extract_reference_species() {
     done < "$fasta_file"
 }
 
+# csv_header(): Read the first CSV line and normalize its carriage return and quoting.
 csv_header() {
     local file="$1"
     awk 'NF { gsub(/\r$/, "", $0); print; exit }' "$file"
 }
 
+# require_csv_extension(): Reject input paths without the expected CSV filename extension.
 require_csv_extension() {
     local file="$1"
     if [[ "${file##*.}" != "csv" && "${file##*.}" != "CSV" ]]; then
@@ -235,6 +276,7 @@ require_csv_extension() {
     fi
 }
 
+# validate_csv_has_commas(): Reject files whose header does not look comma-separated.
 validate_csv_has_commas() {
     local file="$1"
     local header=""
@@ -243,111 +285,45 @@ validate_csv_has_commas() {
     [[ "$header" == *,* ]] || die "CSV file does not appear to be comma-separated: $file"
 }
 
+# validate_gene_performance_file(): Run the shared AWK CSV checker, preserving NA warnings and detailed errors.
 validate_gene_performance_file() {
     local file="$1"
-    local status=0
-
+    [ -r "$file" ] || die "Gene performance file is missing or unreadable: $file"
     require_csv_extension "$file"
-    validate_csv_has_commas "$file"
-
-    if awk -F',' '
-        BEGIN { found = 0 }
-        NF {
-            gsub(/\r$/, "", $0)
-            if (found == 0) {
-                if (NF != 2 || $1 != "gene" || $2 != "performance") {
-                    exit 10
-                }
-                found = 1
-                next
-            }
-
-            if (NF != 2 || $1 == "" || $2 == "" || $2 !~ /^[0-9]+([.][0-9]+)?$/) {
-                exit 11
-            }
-        }
-        END {
-            if (found == 0) {
-                exit 12
-            }
-        }
-    ' "$file"; then
-        status=0
+    if LC_ALL=C awk -f "$SCRIPT_DIR/gene_performance.awk" "$file"; then
+        log "Gene performance calibration file format check passed."
     else
-        status=$?
+        die "Gene performance file check failed: $file"
     fi
-
-    case $status in
-        0) log "Gene performance calibration file format check passed." ;;
-        10) die "Gene performance file must be a comma-separated CSV with header 'gene,performance': $file" ;;
-        11) die "Gene performance file must contain two columns: gene name and numeric percentage performance: $file" ;;
-        12) die "Gene performance file is empty: $file" ;;
-        *) die "Unable to validate gene performance file: $file" ;;
-    esac
 }
 
+# validate_thresholds_file(): Validate the eight-parameter filtering CSV before downstream filtering.
 validate_thresholds_file() {
     local file="$1"
-    local expected_header="min_similarity,min_length,max_gapopens,max_mismatches,max_evalue,min_bitscore,min_gene_performance,min_parliament_size"
     local status=0
 
+    [ -f "$file" ] || die "File not found: $file"
     require_csv_extension "$file"
-    validate_csv_has_commas "$file"
-
-    if awk -F',' -v expected_header="$expected_header" '
-        BEGIN { row = 0 }
-        NF {
-            gsub(/\r$/, "", $0)
-            row++
-
-            if (row == 1) {
-                if ($0 != expected_header) {
-                    exit 10
-                }
-                next
-            }
-
-            if (row == 2) {
-                if (NF != 8) {
-                    exit 11
-                }
-
-                for (i = 1; i <= NF; i++) {
-                    if ($i == "" || $i !~ /^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/) {
-                        exit 12
-                    }
-                }
-                next
-            }
-
-            exit 13
-        }
-        END {
-            if (row == 0) {
-                exit 14
-            }
-            if (row == 1) {
-                exit 15
-            }
-        }
-    ' "$file"; then
+    if LC_ALL=C awk -f "$SCRIPT_DIR/filtering_thresholds.awk" "$file"; then
         status=0
     else
         status=$?
     fi
-
     case $status in
         0) log "Filtering thresholds calibration file format check passed." ;;
-        10) die "Filtering thresholds file must use the template header '$expected_header': $file" ;;
-        11) die "Filtering thresholds file must contain exactly eight threshold values in the second row: $file" ;;
-        12) die "Filtering thresholds file contains a non-numeric threshold value: $file" ;;
-        13) die "Filtering thresholds file must contain only a header row and one row of thresholds: $file" ;;
-        14) die "Filtering thresholds file is empty: $file" ;;
-        15) die "Filtering thresholds file is missing the thresholds row: $file" ;;
+        10) die "Filtering thresholds file must use parameter,value columns or the eight parameter names followed by one value row: $file" ;;
+        11) die "Filtering thresholds file row width does not match its header: $file" ;;
+        12) die "Filtering thresholds file contains an unexpected parameter: $file" ;;
+        13) die "Filtering thresholds file contains a duplicated parameter: $file" ;;
+        14) die "Filtering thresholds file contains a missing or non-numeric threshold value: $file" ;;
+        15) die "Filtering thresholds file must contain each of the eight required parameters exactly once: $file" ;;
+        16) die "Filtering thresholds file contains a value outside the allowed range: $file" ;;
+        17) die "Legacy filtering thresholds file must contain exactly one value row: $file" ;;
         *) die "Unable to validate filtering thresholds file: $file" ;;
     esac
 }
 
+# validate_confidence_support_file(): Check confidence CSV columns, interval labels, and numeric or NA probability fields.
 validate_confidence_support_file() {
     local file="$1"
     local status=0
@@ -409,6 +385,7 @@ validate_confidence_support_file() {
     esac
 }
 
+# validate_species_groups_file(): Check group CSV headers and unique species names while permitting unassigned groups.
 validate_species_groups_file() {
     local file="$1"
     local status=0
@@ -429,7 +406,7 @@ validate_species_groups_file() {
                 next
             }
 
-            if (NF != 2 || $1 == "" || $2 == "") {
+            if (NF != 2 || $1 == "") {
                 exit 11
             }
 
@@ -437,7 +414,7 @@ validate_species_groups_file() {
                 exit 12
             }
 
-            if ($2 !~ /^[A-Za-z0-9_]+$/) {
+            if ($2 != "" && $2 != "NA" && $2 !~ /^[A-Za-z0-9_]+$/) {
                 exit 13
             }
         }
@@ -458,7 +435,7 @@ validate_species_groups_file() {
     case $status in
         0) log "Species groups file format check passed." ;;
         10) die "Species groups file must use the header 'genus_species,species_group': $file" ;;
-        11) die "Species groups file must contain exactly two populated columns in every row: $file" ;;
+        11) die "Species groups file must contain two columns and a populated species name in every row: $file" ;;
         12) die "Species groups file must use species names in the format Genus_species in the first column: $file" ;;
         13) die "Species group names may only contain letters, numbers and underscores: $file" ;;
         14) die "Species groups file is empty: $file" ;;
@@ -467,33 +444,29 @@ validate_species_groups_file() {
     esac
 }
 
+# check_species_groups_match_reference(): Warn for reference species lacking usable groups; ignore extra species in the groups file.
 check_species_groups_match_reference() {
     local file="$1"
-    local matched=0
     local species=""
+    local group=""
     local missing_species=()
+    local -A assigned_species=()
 
-    while IFS=',' read -r species _ || [ -n "$species" ]; do
+    while IFS=',' read -r species group || [ -n "$species" ]; do
         species=$(trim_cr "$species")
+        group=$(trim_cr "$group")
         [ "$species" != "genus_species" ] || continue
         [ -n "$species" ] || continue
-
-        if [ -n "${REFERENCE_SPECIES[$species]+x}" ]; then
-            matched=1
-        else
-            warn "Species groups file contains species not found in the reference FASTA headers: $species"
+        if [ -n "$group" ] && [ "$group" != "NA" ]; then
+            assigned_species["$species"]=1
         fi
     done < "$file"
 
     for species in "${!REFERENCE_SPECIES[@]}"; do
-        if ! grep -Fqx "$species" < <(tail -n +2 "$file" | cut -d',' -f1 | tr -d '\r'); then
+        if [ -z "${assigned_species[$species]+x}" ]; then
             missing_species+=( "$species" )
         fi
     done
-
-    if [ "$matched" -eq 0 ]; then
-        die "None of the species names in the species groups file match the species names found in the reference FASTA headers."
-    fi
 
     if [ "${#missing_species[@]}" -gt 0 ]; then
         while IFS= read -r species; do
@@ -505,6 +478,7 @@ check_species_groups_match_reference() {
     fi
 }
 
+# blast_db_complete(): Return success only when every expected BLAST database component exists.
 blast_db_complete() {
     local reference_fasta="$1"
     local suffix=""
@@ -518,28 +492,14 @@ blast_db_complete() {
     return 0
 }
 
+# lookup_threshold_value(): Retrieve one named threshold from the checked parameter/value CSV.
 lookup_threshold_value() {
     local file="$1"
-    local column_name="$2"
-
-    awk -F',' -v column_name="$column_name" '
-        NR == 1 {
-            for (i = 1; i <= NF; i++) {
-                gsub(/\r$/, "", $i)
-                if ($i == column_name) {
-                    column = i
-                }
-            }
-            next
-        }
-        NR == 2 {
-            gsub(/\r$/, "", $column)
-            print $column
-            exit
-        }
-    ' "$file"
+    local parameter="$2"
+    LC_ALL=C awk -v mode=lookup -v parameter="$parameter" -f "$SCRIPT_DIR/filtering_thresholds.awk" "$file"
 }
 
+# print_filtering_threshold_summary(): Print the selected filtering values in their biological parameter order.
 print_filtering_threshold_summary() {
     local file="$1"
     local values=""
@@ -552,26 +512,7 @@ print_filtering_threshold_summary() {
     local min_gene_performance=""
     local min_parliament_size=""
 
-    values=$(awk -F',' '
-        NR == 1 {
-            for (i = 1; i <= NF; i++) {
-                gsub(/\r$/, "", $i)
-                columns[$i] = i
-            }
-            next
-        }
-        NR == 2 {
-            print $columns["min_similarity"] "," \
-                $columns["min_length"] "," \
-                $columns["max_gapopens"] "," \
-                $columns["max_mismatches"] "," \
-                $columns["max_evalue"] "," \
-                $columns["min_bitscore"] "," \
-                $columns["min_gene_performance"] "," \
-                $columns["min_parliament_size"]
-            exit
-        }
-    ' "$file")
+    values=$(LC_ALL=C awk -v mode=summary -f "$SCRIPT_DIR/filtering_thresholds.awk" "$file")
 
     IFS=',' read -r min_similarity min_length max_gapopens max_mismatches max_evalue min_bitscore min_gene_performance min_parliament_size <<< "$values"
 
@@ -586,6 +527,7 @@ print_filtering_threshold_summary() {
     log "Minimum gene parliament size: $min_parliament_size"
 }
 
+# print_confidence_support_summary(): Print the probability values associated with each confidence support interval.
 print_confidence_support_summary() {
     local file="$1"
 
@@ -610,6 +552,8 @@ print_confidence_support_summary() {
     ' "$file"
 }
 
+# --- Output selection and safe BLAST execution ---
+# normalise_output_formats(): Validate requested formats and expand all into the set of supported output types.
 normalise_output_formats() {
     local raw_formats="$1"
     local token=""
@@ -651,23 +595,72 @@ normalise_output_formats() {
     fi
 }
 
+# output_file_requested(): Return success when the named output format was requested.
 output_file_requested() {
     local format="$1"
     [ -n "${OUTPUT_FORMAT_SET[$format]+x}" ]
 }
 
+# ensure_temp_dir(): Create the temporary workspace on demand and explain creation failures.
 ensure_temp_dir() {
     if [ -z "$temp_dir" ] || [ ! -d "$temp_dir" ]; then
-        temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gpid-identification.XXXXXX")
+        temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gpid-identification.XXXXXX") || \
+            die "Could not create temporary directory in ${TMPDIR:-/tmp}. Check permissions, free space and quota."
     fi
 }
 
+# run_gene_blast(): Validate gene paths, consume the full BLAST stream, and return the best hit or a diagnostic exit status.
+run_gene_blast() {
+    local gene="$1" query_file="$2" database_file="$3"
+    local suffix="" status
+    local -a pipeline_status=()
+
+    [ -n "$query_file" ] || { warn "No sample FASTA path was recorded for gene '$gene'."; return 1; }
+    [ -n "$database_file" ] || { warn "No reference FASTA path was recorded for gene '$gene'."; return 1; }
+    [ -r "$query_file" ] && [ -s "$query_file" ] || {
+        warn "Sample FASTA for gene '$gene' is missing, empty or unreadable: $query_file"; return 1;
+    }
+    [ -r "$database_file" ] && [ -s "$database_file" ] || {
+        warn "Reference FASTA for gene '$gene' is missing, empty or unreadable: $database_file"; return 1;
+    }
+    for suffix in "${BLAST_SUFFIXES[@]}"; do
+        [ -r "${database_file}${suffix}" ] || {
+            warn "BLAST database file for gene '$gene' is missing or unreadable: ${database_file}${suffix}"; return 1;
+        }
+    done
+
+    # Read the complete sorted stream. An early-closing consumer such as head
+    # can give sort SIGPIPE (141), which fails the pipeline under pipefail.
+    # Keep the existing bit-score ranking and random ordering of tied targets.
+    if blastn \
+        -query "$query_file" \
+        -db "$database_file" \
+        -task megablast \
+        -outfmt "6 qseqid sseqid pident length mismatch gapopen evalue bitscore" \
+        -max_target_seqs 1000000 |
+        LC_ALL=C sort -t $'\t' -k8,8rn -k2,2R |
+        awk -v genename="$gene" 'NR == 1 {print genename "\t" $0}'; then
+        return 0
+    else
+        # Capture these immediately, before another command overwrites them.
+        pipeline_status=("${PIPESTATUS[@]}")
+        printf 'Error: BLAST matching failed for gene %s (blastn=%s, sort=%s, awk=%s).\n' \
+            "$gene" "${pipeline_status[@]}" >&2
+        printf 'Query: %s\nDatabase: %s\n' "$query_file" "$database_file" >&2
+        for status in "${pipeline_status[@]}"; do
+            if [ "$status" -ne 0 ]; then
+                return "$status"
+            fi
+        done
+    fi
+}
+
+# planned_output_files(): List the files expected for the current sample and requested output settings.
 planned_output_files() {
     local files=()
 
     if [ "$remove_intermediates" -eq 0 ]; then
         files+=(
-            "$output_dir/genelist_high_performance.txt"
             "$output_dir/${sample}_blast.tsv"
         )
     fi
@@ -691,6 +684,7 @@ planned_output_files() {
     printf '%s\n' "${files[@]}"
 }
 
+# check_existing_output_files(): Detect output collisions and enforce the explicit overwrite setting.
 check_existing_output_files() {
     local existing_files=()
     local path=""
@@ -724,6 +718,7 @@ check_existing_output_files() {
     die "Output files already exist in '$output_dir'. Use --overwrite_outputs to overwrite the existing outputs."
 }
 
+# create_dummy_calibration_files(): Create permissive temporary thresholds and unknown confidence values for calibration bypass.
 create_dummy_calibration_files() {
     local gene=""
 
@@ -741,8 +736,15 @@ create_dummy_calibration_files() {
     } > "$gene_performance_file"
 
     cat > "$thresholds_file" <<'EOF'
-min_similarity,min_length,max_gapopens,max_mismatches,max_evalue,min_bitscore,min_gene_performance,min_parliament_size
-0,0,99999,99999,99999,0,0,0
+parameter,value
+min_similarity,0
+min_length,0
+max_gapopens,99999
+max_mismatches,99999
+max_evalue,99999
+min_bitscore,0
+min_gene_performance,0
+min_parliament_size,0
 EOF
 
     cat > "$confidence_support_file" <<'EOF'
@@ -757,6 +759,7 @@ EOF
     log "  $confidence_support_file"
 }
 
+# --- Parse command-line options ---
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -i)
@@ -898,7 +901,7 @@ sample=$(basename "$sample_dir")
 normalise_output_formats "$output_formats_raw"
 
 if [ -z "$output_dir" ]; then
-    output_dir="identification/$sample"
+    output_dir="identifications"
 fi
 
 output_dir=${output_dir%/}
@@ -911,6 +914,8 @@ check_existing_output_files
 
 mkdir -p "$output_dir" || die "Could not create output directory: $output_dir"
 
+# --- Step 1 - Check input directories and output collisions ---
+current_step="Step 1/6"
 log "Step 1/6: Checking input directories and output settings."
 log "Output directory: $output_dir"
 if [ "$remove_intermediates" -eq 1 ]; then
@@ -933,6 +938,8 @@ if [ "${#REFERENCE_SPECIES[@]}" -eq 0 ]; then
     die "No species names could be extracted from the FASTA headers in the reference directory."
 fi
 
+# --- Step 2 - Match sample genes to reference data ---
+current_step="Step 2/6"
 log "Step 2/6: Checking sample genes against the reference dataset."
 
 matched_genes=()
@@ -972,12 +979,14 @@ if [ "${#missing_databases[@]}" -gt 0 ]; then
 fi
 
 log "Reference directory contains BLAST databases for all sample genes found in the reference."
+# --- Step 3 - Resolve calibration, confidence, and species groups ---
+current_step="Step 3/6"
 
 if [ "$bypass_calibration" -eq 1 ]; then
-    log "Step 3/6: Bypassing calibration and validation inputs."
+    log "Step 3/6: Bypassing calibration and confidence inputs."
     create_dummy_calibration_files
 else
-    log "Step 3/6: Checking calibration and validation inputs."
+    log "Step 3/6: Checking calibration and confidence inputs."
     validate_gene_performance_file "$gene_performance_file"
     validate_thresholds_file "$thresholds_file"
     validate_confidence_support_file "$confidence_support_file"
@@ -999,37 +1008,37 @@ gene_performance_threshold=$(lookup_threshold_value "$thresholds_file" "min_gene
 
 if [ "$remove_intermediates" -eq 1 ]; then
     ensure_temp_dir
-    genelist_file="$temp_dir/genelist_high_performance.txt"
     blast_file="$temp_dir/${sample}_blast.tsv"
 else
-    genelist_file="$output_dir/genelist_high_performance.txt"
     blast_file="$output_dir/${sample}_blast.tsv"
 fi
 
+# --- Step 4 - Keep genes meeting the performance threshold ---
+current_step="Step 4/6"
 log "Step 4/6: Selecting high-performance genes for identification."
 
 genelist_high_performance=$(
-    awk -F',' -v threshold="$gene_performance_threshold" '
-        NR > 1 {
-            gsub(/\r$/, "", $1)
-            gsub(/\r$/, "", $2)
-            if ($2 + 0 >= threshold) {
-                print $1
-            }
-        }
-    ' "$gene_performance_file"
+    LC_ALL=C awk -v mode=filter -v threshold="$gene_performance_threshold" \
+        -f "$SCRIPT_DIR/gene_performance.awk" "$gene_performance_file"
 )
 
-{
+# Intersect performance-qualified genes with genes that have sample/reference
+# matches. Keep this list in memory; it is not a persistent output artifact.
+selected_gene_names=$(
     comm -12 \
         <(printf '%s\n' "$genelist_high_performance" | awk 'NF' | sort -u) \
         <(printf '%s\n' "${matched_genes[@]}" | sort -u)
-} > "$genelist_file"
+)
+selected_genes=()
+while IFS= read -r gene; do
+    [ -n "$gene" ] || continue
+    selected_genes+=( "$gene" )
+done <<< "$selected_gene_names"
 
-high_performance_gene_count=$(awk 'NF { count++ } END { print count + 0 }' "$genelist_file")
+high_performance_gene_count=${#selected_genes[@]}
 log "Genes after gene performance filtering: $high_performance_gene_count"
 
-if [ ! -s "$genelist_file" ]; then
+if [ "$high_performance_gene_count" -eq 0 ]; then
     warn "No gene passed gene performance threshold."
 
     if output_file_requested csv; then
@@ -1048,34 +1057,47 @@ EOF
     exit 1
 fi
 
-if [ "$remove_intermediates" -eq 0 ]; then
-    log "High-performance gene list written:"
-    log "$genelist_file"
-else
-    log "High-performance gene list created temporarily for internal use only."
-fi
 log ""
 
 command -v blastn >/dev/null 2>&1 || die "blastn command not found in PATH."
 command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
+command -v sort >/dev/null 2>&1 || die "sort command not found in PATH."
 
+# --- Step 5 - Stage BLAST output and publish it only after success ---
+current_step="Step 5/6"
 log "Step 5/6: Matching sample genes against reference BLAST databases."
+log "BLAST executable: $(command -v blastn)"
+log "Sort executable: $(command -v sort)"
+blast_staging_file=$(mktemp "${blast_file}.tmp.XXXXXX") || \
+    die "Could not create BLAST output beside $blast_file. Check permissions, free space and quota."
+printf 'gene\tquery\ttarget\tpident\tlength\tmismatch\tgapopen\tevalue\tbitscore\n' > "$blast_staging_file"
+gene_number=0
 
-while IFS= read -r gene; do
-    [ -n "$gene" ] || continue
+for gene in "${selected_genes[@]}"; do
+    current_gene="$gene"
+    gene_number=$((gene_number + 1))
+    log "Matching gene $gene_number/$high_performance_gene_count: $gene"
+    # Safe default expansion lets the helper diagnose missing mappings under set -u.
+    query_file="${SAMPLE_GENE_FILES[$gene]-}"
+    database_file="${REFERENCE_GENE_FILES[$gene]-}"
+    if top_match=$(run_gene_blast "$gene" "$query_file" "$database_file"); then
+        if [ -n "$top_match" ]; then
+            printf '%s\n' "$top_match" >> "$blast_staging_file"
+        else
+            log "No BLAST hits for gene: $gene"
+        fi
+    else
+        blast_status=$?
+        printf 'Error: Step 5/6 stopped at gene %s (exit status %s). No new BLAST table was published and Step 6/6 was not run.\n' \
+            "$gene" "$blast_status" >&2
+        exit "$blast_status"
+    fi
+done
 
-    blastn \
-        -query "${SAMPLE_GENE_FILES[$gene]}" \
-        -db "${REFERENCE_GENE_FILES[$gene]}" \
-        -task megablast \
-        -outfmt "6 qseqid sseqid pident length mismatch gapopen evalue bitscore" \
-        -max_target_seqs 1000000 |
-        sort -t $'\t' -k8,8rn -k2,2R |
-        head -1 |
-        awk -v genename="$gene" '{print genename "\t" $0}'
-done < "$genelist_file" > "$blast_file"
-
-sed -i '1i gene\tquery\ttarget\tpident\tlength\tmismatch\tgapopen\tevalue\tbitscore' "$blast_file"
+current_gene=""
+# Publish only a complete table; failures above leave cleanup to remove staging.
+mv -f -- "$blast_staging_file" "$blast_file" || die "Could not save completed BLAST table: $blast_file"
+blast_staging_file=""
 
 if [ "$remove_intermediates" -eq 0 ]; then
     log "Top-match BLAST table written:"
@@ -1085,6 +1107,8 @@ else
 fi
 log ""
 
+# --- Step 6 - Run the Gene Parliament analysis and report outputs ---
+current_step="Step 6/6"
 log "Step 6/6: Computing Gene Parliament and writing requested outputs."
 
 Rscript \

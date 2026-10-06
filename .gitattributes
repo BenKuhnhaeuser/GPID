@@ -1,0 +1,9 @@
+# Keep executable scripts and package metadata portable across Windows and Unix.
+gpid text eol=lf
+VERSION text eol=lf
+*.sh text eol=lf
+*.R text eol=lf
+*.awk text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf

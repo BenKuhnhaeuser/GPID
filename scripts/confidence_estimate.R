@@ -1,9 +1,12 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Filter known-sample matches, select top identifications, and compare confidence bin counts.
 
+# --- Read CLI paths and load analysis dependencies ---
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 4) {
-  stop("Usage: validation_confidence.R <prepared_input.rds> <gene_performance.csv> <filtering_thresholds.csv> <output_dir>", call. = FALSE)
+  stop("Usage: confidence_estimate.R <prepared_input.rds> <gene_performance.csv> <thresholds_filtering.csv> <output_dir>", call. = FALSE)
 }
 
 prepared_input <- args[[1]]
@@ -20,10 +23,13 @@ suppressPackageStartupMessages({
 
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
+# --- Input checks used before statistical calculations ---
+# abort(): Stop processing with a formatted, user-readable error message.
 abort <- function(...) {
   stop(sprintf(...), call. = FALSE)
 }
 
+# ensure_columns(): Reject input tables missing required column names.
 ensure_columns <- function(data, expected, label) {
   missing <- setdiff(expected, names(data))
   if (length(missing) > 0) {
@@ -31,6 +37,7 @@ ensure_columns <- function(data, expected, label) {
   }
 }
 
+# ensure_numeric_range(): Convert required columns to numeric values and enforce their permitted ranges.
 ensure_numeric_range <- function(data, columns, label, ranges) {
   for (column in columns) {
     if (any(is.na(data[[column]]))) {
@@ -57,6 +64,7 @@ ensure_numeric_range <- function(data, columns, label, ranges) {
   data
 }
 
+# read_csv_checked(): Read an input table and include the source filename in any parsing error.
 read_csv_checked <- function(file, label) {
   data <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE, strip.white = TRUE)
   if (nrow(data) == 0) {
@@ -65,21 +73,13 @@ read_csv_checked <- function(file, label) {
   data
 }
 
-gene_performance <- read_csv_checked(gene_performance_file, "Gene performance file")
-ensure_columns(gene_performance, c("gene", "performance"), "Gene performance file")
-gene_performance <- gene_performance[, c("gene", "performance"), drop = FALSE]
-gene_performance <- ensure_numeric_range(
-  gene_performance,
-  "performance",
-  "Gene performance file",
-  list(performance = c(0, 100))
-)
+script_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1]])
+source(file.path(dirname(script_file), "gene_performance.R"))
+source(file.path(dirname(script_file), "confidence_helpers.R"))
+# --- Read gene performance with shared NA handling ---
+gene_performance <- read_gene_performance(gene_performance_file)
 
-if (anyDuplicated(gene_performance$gene) > 0) {
-  duplicated_genes <- unique(gene_performance$gene[duplicated(gene_performance$gene)])
-  abort("Gene performance file contains duplicated gene names: %s", paste(duplicated_genes, collapse = ", "))
-}
-
+# --- Read and reshape the parameter/value threshold table ---
 filtering_thresholds <- read_csv_checked(filtering_thresholds_file, "Filtering thresholds file")
 expected_thresholds <- c(
   "min_similarity",
@@ -91,13 +91,28 @@ expected_thresholds <- c(
   "min_gene_performance",
   "min_parliament_size"
 )
-ensure_columns(filtering_thresholds, expected_thresholds, "Filtering thresholds file")
-
-if (nrow(filtering_thresholds) != 1) {
-  abort("Filtering thresholds file must contain exactly one row of threshold values.")
+# Normalize the legacy eight-column, single-value-row format before shared checks.
+if (ncol(filtering_thresholds) == 8 && !anyDuplicated(names(filtering_thresholds)) &&
+    setequal(names(filtering_thresholds), expected_thresholds)) {
+  if (nrow(filtering_thresholds) != 1) {
+    abort("Legacy filtering thresholds file must contain exactly one value row.")
+  }
+  filtering_thresholds <- data.frame(parameter = names(filtering_thresholds),
+                                    value = unlist(filtering_thresholds[1, ], use.names = FALSE),
+                                    stringsAsFactors = FALSE)
 }
-
-filtering_thresholds <- filtering_thresholds[, expected_thresholds, drop = FALSE]
+if (!identical(names(filtering_thresholds), c("parameter", "value"))) {
+  abort("Filtering thresholds file must use parameter,value columns or the eight unique parameter names followed by one value row.")
+}
+filtering_thresholds$parameter <- trimws(filtering_thresholds$parameter)
+if (anyNA(filtering_thresholds$parameter) || anyDuplicated(filtering_thresholds$parameter) ||
+    !setequal(filtering_thresholds$parameter, expected_thresholds)) {
+  abort("Filtering thresholds file must contain each of the eight required parameters exactly once.")
+}
+filtering_thresholds <- as.data.frame(as.list(setNames(
+  filtering_thresholds$value[match(expected_thresholds, filtering_thresholds$parameter)],
+  expected_thresholds
+)), check.names = FALSE)
 filtering_thresholds <- ensure_numeric_range(
   filtering_thresholds,
   expected_thresholds,
@@ -114,11 +129,12 @@ filtering_thresholds <- ensure_numeric_range(
   )
 )
 
+# --- Load prepared matches and apply calibration filters ---
 ids <- readRDS(prepared_input)
 ensure_columns(
   ids,
   c("gene", "query", "target_sp", "target_group", "id_correct_close", "pident", "length", "gapopen", "mismatch", "evalue", "bitscore"),
-  "Prepared validation data"
+  "Prepared confidence data"
 )
 
 ids <- left_join(ids, gene_performance, by = "gene")
@@ -143,9 +159,10 @@ filtered_ids <- ids %>%
   )
 
 if (nrow(filtered_ids) == 0) {
-  abort("No validation match passed the calibration filtering thresholds.")
+  abort("No confidence match passed the calibration filtering thresholds.")
 }
 
+# --- Select a top identification per sample with reproducible tie handling ---
 top_id <- filtered_ids %>%
   mutate(probe_kit_genes_postfiltering = n_distinct(gene)) %>%
   group_by(query) %>%
@@ -167,9 +184,11 @@ top_id <- filtered_ids %>%
   ungroup()
 
 if (nrow(top_id) == 0) {
-  abort("No validation sample passed the minimum parliament size threshold.")
+  abort("No confidence sample passed the minimum parliament size threshold.")
 }
 
+# --- Summarize and plot exclusive confidence categories ---
+# confidence(): Summarize exclusive correct, close, and wrong classes into a stacked confidence-bin figure.
 confidence <- function(top_id, bins) {
   bins_df <- data.frame(
     range_support_main_id = cut(
@@ -211,15 +230,17 @@ confidence <- function(top_id, bins) {
     geom_bar(position = "stack", stat = "identity", na.rm = TRUE) +
     geom_text(aes(range_support_main_id, 100, label = paste0("n=", count_all)), vjust = -0.5, size = 3, na.rm = TRUE) +
     geom_text(aes(label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5), size = 3, na.rm = TRUE) +
+    scale_x_discrete(labels = confidence_bin_labels) +
     scale_y_continuous(breaks = seq(0, 100, 20), limits = c(0, 110)) +
     scale_fill_manual(values = c("correct" = "#67B891", "close" = "#D9A55A", "wrong" = "#C85A5A")) +
-    labs(x = "Support for top identification (%)", y = "Samples (%)", fill = "Identification", title = paste(bins, "bins")) +
+    labs(x = "Genes supporting the top identification", y = "Samples (%)", fill = "Identification", title = paste(bins, "bins")) +
     theme_classic(base_size = 12) +
-    theme(plot.title = element_text(face = "bold", size = 13), axis.text.x = element_text(size = 12))
+    theme(plot.title = element_text(face = "bold", size = 13), axis.text.x = element_text(size = 12, angle = 40, hjust = 1))
 }
 
-top_ids_file <- file.path(output_dir, "validate_top_ids.rds")
-confidence_pdf <- file.path(output_dir, "validate_confidence.pdf")
+# --- Save top identifications and the candidate-bin figures ---
+top_ids_file <- file.path(output_dir, "confidence_top_ids.rds")
+confidence_pdf <- file.path(output_dir, "confidence_estimate.pdf")
 
 saveRDS(top_id, top_ids_file)
 
@@ -229,7 +250,7 @@ for (bins in seq(1, 10, 1)) {
 }
 dev.off()
 
-message("Top validation identifications written:")
+message("Top confidence identifications written:")
 message(top_ids_file)
-message("Validation confidence plot written:")
+message("Confidence plot written:")
 message(confidence_pdf)

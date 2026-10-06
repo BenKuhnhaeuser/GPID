@@ -1,4 +1,6 @@
 #!/bin/bash
+# --- Purpose ---
+# Calibration CLI: prepare known samples, assess thresholds, and persist selected values.
 
 #################################################################
 # GeneParliamentID method calibration                           #
@@ -9,6 +11,7 @@
 
 set -euo pipefail
 
+# --- Installation paths, workflow defaults, and shared state ---
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 SCRIPTS_DIR="$SCRIPT_DIR"
@@ -18,7 +21,6 @@ if [ -z "${GPID_VERSION:-}" ] && [ -f "$VERSION_FILE" ]; then
     GPID_VERSION=${GPID_VERSION%$'\r'}
 fi
 GPID_VERSION="${GPID_VERSION:-unknown}"
-TEMPLATE_FILE="$PROJECT_DIR/templates/calibration_filtering_thresholds_template.csv"
 OUTPUT_DIR="calibration"
 PREPARATIONS_OUTPUT_DIR="$OUTPUT_DIR/preparations"
 TEST_OUTPUT_DIR="$OUTPUT_DIR/tests"
@@ -26,6 +28,10 @@ ALIGNMENTS_TEST_OUTPUT_DIR="$TEST_OUTPUT_DIR/alignments"
 GENES_TEST_OUTPUT_DIR="$TEST_OUTPUT_DIR/genes"
 PARLIAMENT_TEST_OUTPUT_DIR="$TEST_OUTPUT_DIR/parliament"
 DEFAULT_PREPARED_FILE="$PREPARATIONS_OUTPUT_DIR/calibration_prepared.rds"
+MANUAL_INPUT_DIR="$OUTPUT_DIR/manual_input_needed"
+DEFAULT_ALIGNMENTS_FILE="$MANUAL_INPUT_DIR/calibration_alignments.tsv"
+DEFAULT_GENES_FILE="$MANUAL_INPUT_DIR/calibration_genes.tsv"
+DEFAULT_PARLIAMENT_FILE="$MANUAL_INPUT_DIR/calibration_parliament.tsv"
 
 BLAST_SUFFIXES=(
     ".ndb"
@@ -43,6 +49,7 @@ BLAST_SUFFIXES=(
 declare -A REFERENCE_GENE_FILES=()
 declare -A CALIBRATION_GENE_FILES=()
 
+# usage(): Print command usage, supported options, and output locations.
 usage() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
@@ -53,33 +60,41 @@ Commands:
   alignments    Identify optimal alignment filtering thresholds
   genes         Estimate gene performance and identify gene threshold
   parliament    Identify minimum parliament size threshold
-  combine       Combine manually selected thresholds
+  combine       Combine selected thresholds and plot the selections
+  help          Show this help message
+
+Use gpid calibrate <command> -h for command-specific help.
 
 Examples:
   gpid calibrate prepare -r reference -i calibration_samples
   gpid calibrate alignments
-  gpid calibrate genes -a calibration/manual_input_needed/calibration_alignments.tsv
-  gpid calibrate parliament -a calibration/manual_input_needed/calibration_alignments.tsv -g calibration/manual_input_needed/calibration_genes.tsv
-  gpid calibrate combine -a calibration/manual_input_needed/calibration_alignments.tsv -g calibration/manual_input_needed/calibration_genes.tsv -p calibration/manual_input_needed/calibration_parliament.tsv
+  gpid calibrate genes -s 98 -l 100 -o 1 -m 5 -e 1e-60 -b 200
+  gpid calibrate parliament -g 30
+  gpid calibrate combine -p 10
 EOF
 }
 
+# usage_preparations(): Print calibration preparation inputs and outputs.
 usage_preparations() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
 Usage: gpid calibrate prepare -r <reference directory> -i <calibration dataset directory>
 
 Required:
-  -r  Reference dataset directory containing one FASTA file per gene and BLAST databases
-      This is usually prepared with gpid reference.
+  -r  Reference dataset directory containing one FASTA file per gene
+      Missing BLAST databases are built automatically.
   -i  Calibration dataset directory containing one FASTA file per gene
 
-Default outputs created for later calibration steps:
+Optional:
+  -h  Show this help message
+
+Outputs (paths relative to the working directory):
   calibration/preparations/calibration_blast.tsv
   calibration/preparations/calibration_prepared.rds
 EOF
 }
 
+# usage_alignments(): Print alignment calibration options and output locations.
 usage_alignments() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
@@ -88,114 +103,120 @@ Usage: gpid calibrate alignments [-i <prepared calibration RDS>]
 Optional:
   -i  Intermediate RDS produced by gpid calibrate prepare
       Default: calibration/preparations/calibration_prepared.rds
+  -h  Show this help message
 
-The default input file is created by gpid calibrate prepare and stored as:
-  calibration/preparations/calibration_prepared.rds
-
-Default output created for the next calibration step:
+Outputs (paths relative to the working directory):
   calibration/manual_input_needed/calibration_alignments.tsv
-
-Calibration test CSV/PDF outputs are written to:
-  calibration/tests/alignments/
+  calibration/tests/alignments/ (threshold curves as CSV/PDF, plus a composite PDF)
 EOF
 }
 
+# usage_genes(): Print gene calibration options and the alternative threshold-selection methods.
 usage_genes() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid calibrate genes [-i <prepared calibration RDS>] -a <alignment thresholds TSV>
+Usage: gpid calibrate genes [-i <prepared calibration RDS>] [-a <alignment thresholds TSV>] [-s <similarity> -l <length> -o <gap openings> -m <mismatches> -e <E-value> -b <Bit-score>]
 
-Required:
-  -a  Alignment thresholds TSV produced and manually edited after gpid calibrate alignments
-      Default output path from gpid calibrate alignments:
-        calibration/manual_input_needed/calibration_alignments.tsv
+Selected alignment thresholds (supply all six flags together):
+  -s  Minimum alignment similarity (min_similarity)
+  -l  Minimum alignment length (min_length)
+  -o  Maximum gap openings (max_gapopens)
+  -m  Maximum mismatches (max_mismatches)
+  -e  Maximum E-value (max_evalue)
+  -b  Minimum Bit-score (min_bitscore)
+      Values are saved to the default alignment TSV listed below.
+      Alternatively, edit that TSV and omit these flags.
 
 Optional:
   -i  Intermediate RDS produced by gpid calibrate prepare
       Default: calibration/preparations/calibration_prepared.rds
+  -a  Alignment thresholds TSV (cannot be combined with threshold flags)
+      Default: calibration/manual_input_needed/calibration_alignments.tsv
+  -h  Show this help message
 
-The default input file is created by gpid calibrate prepare and stored as:
-  calibration/preparations/calibration_prepared.rds
-
-Default output created for the next calibration step:
+Outputs (paths relative to the working directory):
   calibration/manual_input_needed/calibration_genes.tsv
-
-Additional output created by this command:
-  calibration/calibration_gene_performance.csv
-
-Calibration test CSV/PDF outputs are written to:
-  calibration/tests/genes/
+  gene_performance.csv
+  calibration/tests/genes/ (gene statistics and threshold curves as CSV/PDF)
 EOF
 }
 
+# usage_parliament(): Print parliament calibration options and default threshold files.
 usage_parliament() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid calibrate parliament [-i <prepared calibration RDS>] -a <alignment thresholds TSV> -g <gene threshold TSV>
+Usage: gpid calibrate parliament [-i <prepared calibration RDS>] [-a <alignment thresholds TSV>] [-g <minimum gene performance or gene threshold TSV>]
 
-Required:
-  -a  Alignment thresholds TSV produced and manually edited after gpid calibrate alignments
-      Default output path from gpid calibrate alignments:
-        calibration/manual_input_needed/calibration_alignments.tsv
-  -g  Gene threshold TSV produced and manually edited after gpid calibrate genes
-      Default output path from gpid calibrate genes:
-        calibration/manual_input_needed/calibration_genes.tsv
+Threshold selection:
+  -g  Minimum gene performance (min_gene_performance, 0-100)
+      Numeric values are saved to the default TSV; a TSV path is also accepted.
+      Default: calibration/manual_input_needed/calibration_genes.tsv
 
 Optional:
+  -a  Alignment thresholds TSV
+      Default: calibration/manual_input_needed/calibration_alignments.tsv
   -i  Intermediate RDS produced by gpid calibrate prepare
       Default: calibration/preparations/calibration_prepared.rds
+  -h  Show this help message
 
-The default input file is created by gpid calibrate prepare and stored as:
-  calibration/preparations/calibration_prepared.rds
-
-Default output created for the combine step:
+Outputs (paths relative to the working directory):
   calibration/manual_input_needed/calibration_parliament.tsv
-
-Calibration test CSV/PDF outputs are written to:
-  calibration/tests/parliament/
+  calibration/tests/parliament/ (threshold curves as CSV/PDF)
 EOF
 }
 
+# usage_combine(): Print threshold combination options and the required curve-data locations.
 usage_combine() {
     printf 'GPID version: %s\n\n' "$GPID_VERSION"
     cat <<'EOF'
-Usage: gpid calibrate combine -a <alignment thresholds TSV> -g <gene threshold TSV> -p <parliament threshold TSV>
+Usage: gpid calibrate combine [-a <alignment thresholds TSV>] [-g <gene threshold TSV>] [-p <minimum parliament size or parliament threshold TSV>]
 
-Required:
-  -a  Alignment thresholds TSV produced and manually edited after gpid calibrate alignments
-      Default output path from gpid calibrate alignments:
-        calibration/manual_input_needed/calibration_alignments.tsv
-  -g  Gene threshold TSV produced and manually edited after gpid calibrate genes
-      Default output path from gpid calibrate genes:
-        calibration/manual_input_needed/calibration_genes.tsv
-  -p  Parliament threshold TSV produced and manually edited after gpid calibrate parliament
-      Default output path from gpid calibrate parliament:
-        calibration/manual_input_needed/calibration_parliament.tsv
+Threshold selection:
+  -p  Minimum parliament size (min_parliament_size, 0-99999)
+      Numeric values are saved to the default TSV; a TSV path is also accepted.
+      Default: calibration/manual_input_needed/calibration_parliament.tsv
 
-Default output created by this command:
-  calibration/calibration_filtering_thresholds.csv
+Optional:
+  -a  Alignment thresholds TSV
+      Default: calibration/manual_input_needed/calibration_alignments.tsv
+  -g  Gene threshold TSV
+      Default: calibration/manual_input_needed/calibration_genes.tsv
+  -h  Show this help message
+
+Outputs (paths relative to the working directory):
+  thresholds_filtering.csv (columns: parameter,value; one row per threshold)
+  thresholds_filtering.pdf (eight calibration plots with selected thresholds in red)
+
+The figure uses the CSV results in calibration/tests/ from the alignments,
+genes and parliament steps. Run those steps before combining thresholds.
 EOF
 }
 
+# --- Shared logging and input helpers ---
+# log(): Write a progress or result message to standard output.
 log() {
     printf '%s\n' "$1"
 }
 
+# warn(): Write a nonfatal warning to standard error.
 warn() {
     printf 'Warning: %s\n' "$1" >&2
 }
 
+# die(): Report a fatal error and terminate the shell workflow.
 die() {
     printf 'Error: %s\n' "$1" >&2
     exit 1
 }
 
+# trim_cr(): Remove a trailing carriage return from a Windows-format input line.
 trim_cr() {
     local value="$1"
     value=${value%$'\r'}
     printf '%s' "$value"
 }
 
+# gene_name_from_path(): Derive the gene key from a FASTA basename, ignoring extension case.
 gene_name_from_path() {
     local file_name
     file_name=$(basename "$1")
@@ -207,6 +228,7 @@ gene_name_from_path() {
     esac
 }
 
+# collect_gene_files(): Populate the named associative array with gene-to-FASTA paths; reject duplicate gene keys.
 collect_gene_files() {
     local dir="$1"
     local target="$2"
@@ -246,6 +268,7 @@ collect_gene_files() {
     return 0
 }
 
+# validate_multi_sequence_fasta(): Check multi-sample FASTA records for sequence data, unique names, and species-formatted headers.
 validate_multi_sequence_fasta() {
     local fasta_file="$1"
     local context="$2"
@@ -324,6 +347,7 @@ validate_multi_sequence_fasta() {
     return "$file_failed"
 }
 
+# blast_db_complete(): Return success only when every expected BLAST database component exists.
 blast_db_complete() {
     local reference_fasta="$1"
     local suffix=""
@@ -337,16 +361,13 @@ blast_db_complete() {
     return 0
 }
 
-csv_header() {
-    local file="$1"
-    awk 'NF { gsub(/\r$/, "", $0); print; exit }' "$file"
-}
-
+# require_file(): Fail early if the required input file does not exist.
 require_file() {
     local file="$1"
     [ -f "$file" ] || die "File not found: $file"
 }
 
+# require_csv_extension(): Reject input paths without the expected CSV filename extension.
 require_csv_extension() {
     local file="$1"
     if [[ "${file##*.}" != "csv" && "${file##*.}" != "CSV" ]]; then
@@ -354,6 +375,19 @@ require_csv_extension() {
     fi
 }
 
+# validate_gene_performance_file(): Run the shared AWK CSV checker, preserving NA warnings and detailed errors.
+validate_gene_performance_file() {
+    local file="$1"
+    [ -r "$file" ] || die "Gene performance file is missing or unreadable: $file"
+    require_csv_extension "$file"
+    if LC_ALL=C awk -f "$SCRIPT_DIR/gene_performance.awk" "$file"; then
+        log "Gene performance calibration file format check passed."
+    else
+        die "Gene performance file check failed: $file"
+    fi
+}
+
+# validate_single_threshold_file(): Check a one-parameter TSV for the expected key and an allowed numeric value.
 validate_single_threshold_file() {
     local file="$1"
     local expected_parameter="$2"
@@ -365,6 +399,7 @@ validate_single_threshold_file() {
     require_file "$file"
 
     if awk -F'\t' -v expected_parameter="$expected_parameter" -v min="$min_value" -v max="$max_value" '
+        # trim(): Remove surrounding whitespace before comparing names or parsing values.
         function trim(value) {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
             return value
@@ -397,7 +432,7 @@ validate_single_threshold_file() {
                     exit 12
                 }
 
-                if (value !~ /^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/) {
+                if (value !~ /^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/) {
                     exit 13
                 }
 
@@ -438,9 +473,11 @@ validate_single_threshold_file() {
     esac
 }
 
+# threshold_value(): Read the selected value from a checked single-parameter TSV.
 threshold_value() {
     local file="$1"
     awk -F'\t' '
+        # trim(): Remove surrounding whitespace before comparing names or parsing values.
         function trim(value) {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
             return value
@@ -456,6 +493,7 @@ threshold_value() {
     ' "$file"
 }
 
+# validate_alignment_thresholds_for_combine(): Check all six alignment parameters, unique names, numeric values, and allowed ranges.
 validate_alignment_thresholds_for_combine() {
     local file="$1"
     local expected_parameters="min_similarity min_length max_gapopens max_mismatches max_evalue min_bitscore"
@@ -464,6 +502,7 @@ validate_alignment_thresholds_for_combine() {
     require_file "$file"
 
     if awk -F'\t' -v expected_parameters="$expected_parameters" '
+        # trim(): Remove surrounding whitespace before comparing names or parsing values.
         function trim(value) {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
             return value
@@ -511,7 +550,7 @@ validate_alignment_thresholds_for_combine() {
             if (value == "NA" || value == "") {
                 exit 12
             }
-            if (value !~ /^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/) {
+            if (value !~ /^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/) {
                 exit 13
             }
             if ((value + 0) < mins[found] || (value + 0) > maxs[found]) {
@@ -553,12 +592,33 @@ validate_alignment_thresholds_for_combine() {
     esac
 }
 
+# validate_selected_value(): Validate a numeric CLI threshold against its nonnegative upper bound.
+validate_selected_value() {
+    local parameter="$1" value="$2" maximum="$3"
+    if ! awk -v value="$value" -v maximum="$maximum" 'BEGIN {
+        exit !(value ~ /^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/ && value + 0 >= 0 && value + 0 <= maximum)
+    }'; then
+        die "$parameter must be a numeric value between 0 and $maximum: $value"
+    fi
+}
+
+# save_single_threshold(): Persist one selected threshold in the canonical parameter/value TSV.
+save_single_threshold() {
+    local file="$1" parameter="$2" value="$3"
+    mkdir -p "$MANUAL_INPUT_DIR"
+    printf 'parameter\tvalue\n%s\t%s\n' "$parameter" "$value" > "$file"
+    log "Selected threshold saved to $file"
+}
+
+# print_manual_threshold_instructions(): Explain how to pass chosen alignment thresholds to the next calibration step.
 print_manual_threshold_instructions() {
     cat <<'EOF'
-MANUAL INPUT NEEDED: Specify the optimal alignment filtering thresholds in the file calibration/manual_input_needed/calibration_alignments.tsv based on the calibration test files in directory calibration/tests/alignments.
+Select alignment thresholds from calibration/tests/alignments. Pass all six flags (-s, -l, -o, -m, -e, -b) to gpid calibrate genes, or edit calibration/manual_input_needed/calibration_alignments.tsv.
 EOF
 }
 
+# --- Calibration workflow commands ---
+# run_preparations(): Prepare references and calibration BLAST matches, then convert them into the downstream RDS.
 run_preparations() {
     local reference_dir=""
     local calibration_dir=""
@@ -686,11 +746,9 @@ run_preparations() {
 
     log "Preparing calibration data for downstream R analyses..."
     Rscript "$SCRIPTS_DIR/calibration_preparations.R" "$blast_file" "$prepared_file"
-
-    log "Prepared calibration data written:"
-    log "$prepared_file"
 }
 
+# run_alignments(): Check CLI inputs and launch the six alignment-threshold assessments in R.
 run_alignments() {
     local input_file="$DEFAULT_PREPARED_FILE"
 
@@ -714,23 +772,30 @@ run_alignments() {
     command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
     mkdir -p "$OUTPUT_DIR" "$ALIGNMENTS_TEST_OUTPUT_DIR"
 
-    Rscript "$SCRIPTS_DIR/calibration_alignments.R" "$input_file" "$OUTPUT_DIR" "$ALIGNMENTS_TEST_OUTPUT_DIR" "$TEMPLATE_FILE"
+    Rscript "$SCRIPTS_DIR/calibration_alignments.R" "$input_file" "$OUTPUT_DIR" "$ALIGNMENTS_TEST_OUTPUT_DIR"
     print_manual_threshold_instructions
 }
 
+# run_genes(): Resolve or save alignment selections, run gene calibration, and verify the generated performance CSV.
 run_genes() {
     local input_file="$DEFAULT_PREPARED_FILE"
-    local alignments_file=""
+    local alignments_file="$DEFAULT_ALIGNMENTS_FILE"
+    local alignments_file_specified=0
+    local -A selected=()
+    local parameters=(min_similarity min_length max_gapopens max_mismatches max_evalue min_bitscore)
+    local maxima=(100 99999 99999 99999 100 99999)
+    local index
 
-    if [ "$#" -eq 0 ]; then
-        usage_genes
-        exit 1
-    fi
-
-    while getopts ":i:a:h" opt; do
+    while getopts ":i:a:s:l:o:m:e:b:h" opt; do
         case "$opt" in
             i) input_file="$OPTARG" ;;
-            a) alignments_file="$OPTARG" ;;
+            a) alignments_file="$OPTARG"; alignments_file_specified=1 ;;
+            s) selected[min_similarity]="$OPTARG" ;;
+            l) selected[min_length]="$OPTARG" ;;
+            o) selected[max_gapopens]="$OPTARG" ;;
+            m) selected[max_mismatches]="$OPTARG" ;;
+            e) selected[max_evalue]="$OPTARG" ;;
+            b) selected[min_bitscore]="$OPTARG" ;;
             h)
                 usage_genes
                 exit 0
@@ -744,31 +809,45 @@ run_genes() {
         esac
     done
 
-    [ -n "$alignments_file" ] || die "Alignment thresholds TSV is required. Use -a <alignment thresholds TSV>."
+    if [ "${#selected[@]}" -gt 0 ]; then
+        [ "$alignments_file_specified" -eq 0 ] || die "Use either -a or the alignment threshold flags, not both."
+        [ "${#selected[@]}" -eq 6 ] || die "Specify all six alignment threshold flags: -s -l -o -m -e -b."
+        for index in "${!parameters[@]}"; do
+            validate_selected_value "${parameters[$index]}" "${selected[${parameters[$index]}]}" "${maxima[$index]}"
+        done
+    fi
     require_file "$input_file"
-    require_file "$alignments_file"
     command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
+    if [ "${#selected[@]}" -eq 6 ]; then
+        mkdir -p "$MANUAL_INPUT_DIR"
+        {
+            printf 'parameter\tvalue\n'
+            for index in "${!parameters[@]}"; do
+                printf '%s\t%s\n' "${parameters[$index]}" "${selected[${parameters[$index]}]}"
+            done
+        } > "$DEFAULT_ALIGNMENTS_FILE"
+    fi
+    validate_alignment_thresholds_for_combine "$alignments_file"
     mkdir -p "$OUTPUT_DIR" "$GENES_TEST_OUTPUT_DIR"
 
-    Rscript "$SCRIPTS_DIR/calibration_genes.R" "$input_file" "$alignments_file" "$OUTPUT_DIR" "$GENES_TEST_OUTPUT_DIR" "$TEMPLATE_FILE"
-    log "MANUAL INPUT NEEDED: Specify the optimal gene performance threshold in the file calibration/manual_input_needed/calibration_genes.tsv based on the calibration test files in directory calibration/tests/genes."
+    Rscript "$SCRIPTS_DIR/calibration_genes.R" "$input_file" "$alignments_file" "$OUTPUT_DIR" "$GENES_TEST_OUTPUT_DIR"
+    log "Checking the generated gene performance CSV for downstream use..."
+    validate_gene_performance_file "gene_performance.csv"
+    log "Select a gene performance threshold from calibration/tests/genes. Pass it with gpid calibrate parliament -g <value>, or edit $DEFAULT_GENES_FILE."
 }
 
+# run_parliament(): Resolve gene and alignment selections, then assess minimum parliament sizes in R.
 run_parliament() {
     local input_file="$DEFAULT_PREPARED_FILE"
-    local alignments_file=""
-    local genes_file=""
-
-    if [ "$#" -eq 0 ]; then
-        usage_parliament
-        exit 1
-    fi
+    local alignments_file="$DEFAULT_ALIGNMENTS_FILE"
+    local genes_file="$DEFAULT_GENES_FILE"
+    local gene_selection=""
 
     while getopts ":i:a:g:h" opt; do
         case "$opt" in
             i) input_file="$OPTARG" ;;
             a) alignments_file="$OPTARG" ;;
-            g) genes_file="$OPTARG" ;;
+            g) gene_selection="$OPTARG"; [ -n "$gene_selection" ] || die "Option -g requires a value or TSV path." ;;
             h)
                 usage_parliament
                 exit 0
@@ -782,37 +861,41 @@ run_parliament() {
         esac
     done
 
-    [ -n "$alignments_file" ] || die "Alignment thresholds TSV is required. Use -a <alignment thresholds TSV>."
-    [ -n "$genes_file" ] || die "Gene threshold TSV is required. Use -g <gene threshold TSV>."
     require_file "$input_file"
-    require_file "$alignments_file"
-    require_file "$genes_file"
+    validate_alignment_thresholds_for_combine "$alignments_file"
     command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
+    if [ -n "$gene_selection" ]; then
+        if [[ "$gene_selection" == */* || "$gene_selection" == *.tsv || -f "$gene_selection" ]]; then
+            genes_file="$gene_selection"
+        else
+            validate_selected_value min_gene_performance "$gene_selection" 100
+            save_single_threshold "$DEFAULT_GENES_FILE" min_gene_performance "$gene_selection"
+        fi
+    fi
+    validate_single_threshold_file "$genes_file" min_gene_performance "Gene performance threshold" 0 100
     mkdir -p "$OUTPUT_DIR" "$PARLIAMENT_TEST_OUTPUT_DIR"
 
-    Rscript "$SCRIPTS_DIR/calibration_parliament.R" "$input_file" "$alignments_file" "$genes_file" "$OUTPUT_DIR" "$PARLIAMENT_TEST_OUTPUT_DIR" "$TEMPLATE_FILE"
-    log "MANUAL INPUT NEEDED: Specify the optimal minimum parliament size threshold in the file calibration/manual_input_needed/calibration_parliament.tsv based on the calibration test files in directory calibration/tests/parliament."
+    Rscript "$SCRIPTS_DIR/calibration_parliament.R" "$input_file" "$alignments_file" "$genes_file" "$OUTPUT_DIR" "$PARLIAMENT_TEST_OUTPUT_DIR"
+    log "Select a parliament size threshold from calibration/tests/parliament. Pass it with gpid calibrate combine -p <value>, or edit $DEFAULT_PARLIAMENT_FILE."
 }
 
+# run_combine(): Read all selected thresholds, write the combined CSV, and create the annotated summary figure.
 run_combine() {
-    local alignments_file=""
-    local genes_file=""
-    local parliament_file=""
-    local output_file="$OUTPUT_DIR/calibration_filtering_thresholds.csv"
+    local alignments_file="$DEFAULT_ALIGNMENTS_FILE"
+    local genes_file="$DEFAULT_GENES_FILE"
+    local parliament_file="$DEFAULT_PARLIAMENT_FILE"
+    local parliament_selection=""
+    local output_file="thresholds_filtering.csv"
+    local output_figure="thresholds_filtering.pdf"
     local alignment_values=""
     local gene_value=""
     local parliament_value=""
-
-    if [ "$#" -eq 0 ]; then
-        usage_combine
-        exit 1
-    fi
 
     while getopts ":a:g:p:h" opt; do
         case "$opt" in
             a) alignments_file="$OPTARG" ;;
             g) genes_file="$OPTARG" ;;
-            p) parliament_file="$OPTARG" ;;
+            p) parliament_selection="$OPTARG"; [ -n "$parliament_selection" ] || die "Option -p requires a value or TSV path." ;;
             h)
                 usage_combine
                 exit 0
@@ -826,21 +909,28 @@ run_combine() {
         esac
     done
 
-    [ -n "$alignments_file" ] || die "Alignment thresholds TSV is required. Use -a <alignment thresholds TSV>."
-    [ -n "$genes_file" ] || die "Gene threshold TSV is required. Use -g <gene threshold TSV>."
-    [ -n "$parliament_file" ] || die "Parliament threshold TSV is required. Use -p <parliament threshold TSV>."
+    command -v Rscript >/dev/null 2>&1 || die "Rscript command not found in PATH."
 
-    log "Step 1/5: Checking alignment filtering thresholds."
+    log "Step 1/6: Checking alignment filtering thresholds."
     validate_alignment_thresholds_for_combine "$alignments_file"
 
-    log "Step 2/5: Checking gene performance threshold."
+    log "Step 2/6: Checking gene performance threshold."
     validate_single_threshold_file "$genes_file" "min_gene_performance" "Gene performance threshold" 0 100
 
-    log "Step 3/5: Checking parliament size threshold."
+    log "Step 3/6: Checking parliament size threshold."
+    if [ -n "$parliament_selection" ]; then
+        if [[ "$parliament_selection" == */* || "$parliament_selection" == *.tsv || -f "$parliament_selection" ]]; then
+            parliament_file="$parliament_selection"
+        else
+            validate_selected_value min_parliament_size "$parliament_selection" 99999
+            save_single_threshold "$DEFAULT_PARLIAMENT_FILE" min_parliament_size "$parliament_selection"
+        fi
+    fi
     validate_single_threshold_file "$parliament_file" "min_parliament_size" "Parliament size threshold" 0 99999
 
-    log "Step 4/5: Reading specified calibration thresholds."
+    log "Step 4/6: Reading specified calibration thresholds."
     alignment_values=$(awk -F'\t' '
+        # trim(): Remove surrounding whitespace before comparing names or parsing values.
         function trim(value) {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
             return value
@@ -860,12 +950,19 @@ run_combine() {
     gene_value=$(threshold_value "$genes_file")
     parliament_value=$(threshold_value "$parliament_file")
 
-    log "Step 5/5: Writing combined filtering thresholds CSV."
-    mkdir -p "$OUTPUT_DIR"
+    log "Step 5/6: Writing combined filtering thresholds CSV."
     {
-        csv_header "$TEMPLATE_FILE"
-        printf '%s,%s,%s\n' "$alignment_values" "$gene_value" "$parliament_value"
+        printf 'parameter,value\n'
+        awk -F'\t' 'NF {
+            gsub(/\r$/, "", $0)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+            if ($1 != "parameter") print $1 "," $2
+        }' "$alignments_file" "$genes_file" "$parliament_file"
     } > "$output_file"
+
+    log "Step 6/6: Plotting selected calibration thresholds."
+    Rscript "$SCRIPTS_DIR/calibration_combine.R" "$output_file" "$TEST_OUTPUT_DIR" "$output_figure"
 
     IFS=',' read -r min_similarity min_length max_gapopens max_mismatches max_evalue min_bitscore <<< "$alignment_values"
 
@@ -882,6 +979,7 @@ run_combine() {
     log "$output_file"
 }
 
+# --- Dispatch the calibration subcommand ---
 if [ "$#" -eq 0 ]; then
     usage
     exit 1

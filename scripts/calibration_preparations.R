@@ -1,5 +1,8 @@
 #!/usr/bin/env Rscript
+# --- Purpose ---
+# Prepare calibration RDS data by deriving species identities and match correctness from BLAST.
 
+# --- Read CLI paths and expected BLAST columns ---
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 2) {
@@ -11,6 +14,7 @@ prepared_output <- args[[2]]
 
 required_columns <- c("gene", "query", "target", "pident", "length", "mismatch", "gapopen", "evalue", "bitscore")
 
+# --- Load BLAST matches ---
 ids <- read.csv(blast_file, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
 
 missing_columns <- setdiff(required_columns, names(ids))
@@ -18,8 +22,10 @@ if (length(missing_columns) > 0) {
   stop(paste("BLAST file is missing required columns:", paste(missing_columns, collapse = ", ")), call. = FALSE)
 }
 
+# species_name(): Extract the first two underscore-delimited header fields as the species name.
 species_name <- function(x) {
   parts <- strsplit(as.character(x), "_", fixed = TRUE)
+  # Callback: Join the genus and species tokens, or return NA for incomplete headers.
   vapply(parts, function(part) {
     if (length(part) < 2) {
       NA_character_
@@ -29,6 +35,9 @@ species_name <- function(x) {
   }, character(1))
 }
 
+# --- Derive exact-species correctness for calibration ---
+# Calibration uses correct/wrong labels; group-based close labels are assigned
+# later in the separate confidence workflow, not in threshold calibration.
 ids$query_sp <- species_name(ids$query)
 ids$target_sp <- species_name(ids$target)
 ids$query_samples <- length(unique(ids$query))
@@ -46,6 +55,7 @@ factor_columns <- c(
 ids[factor_columns] <- lapply(ids[factor_columns], factor)
 ids$id_correct_close <- factor(ids$id_correct_close, c("correct", "close", "wrong"))
 
+# --- Save the prepared dataset ---
 dir.create(dirname(prepared_output), recursive = TRUE, showWarnings = FALSE)
 saveRDS(ids, prepared_output)
 
