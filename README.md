@@ -2,7 +2,7 @@
 # GeneParliamentID:<br>A pipeline for multi-gene species identification
 
 **GeneParliamentID** by Benedikt Kuhnhäuser, Royal Botanic Gardens, Kew  
-Current version: 1.1.2 (June 2026)
+Current version: 1.2.0
 
 **Citation**  
 Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobou, D., Cziba, L., Deklerck, V., Gallego, B., Lisingo, J., Baker, W.J. & Bellot, S. **GeneParliamentID: A pipeline for multi-gene species identification.** (In review)
@@ -10,12 +10,12 @@ Kuhnhäuser, B.G., Quintero-Berns, C., Schley, R., Stevenson, J., Ndiade Bourobo
 ## Overview
 GeneParliamentID (GPID) is a pipeline for identification of biological samples to the species level using hundreds or thousands of genes, such as those generated using targeted sequence capture.  
 
-GPID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification. Besides sample identification, the pipeline includes reference directory preparation, method calibration and method validation.    
+GPID integrates species identifications inferred from individual genes to provide an overall identification that reflects the relative support for each alternative identification. We conceptualise this process as a **“Gene Parliament”** in which each gene represents one part of the genomic identity of an individual, and where the overall species identity is established through consideration of the number of genes supporting each different identification. This approach allows explicit assessment of congruence and discordance among multiple genes in species identification. Besides sample identification, the pipeline includes reference directory preparation, method calibration and confidence estimation.    
 
 The pipeline is structured into four main commands that are explained in detail in the [Wiki](https://github.com/BenKuhnhaeuser/GPID/wiki):  
 1. `gpid reference`: Prepare a reference directory. See [1. Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction).  
 2. `gpid calibrate`: Run the calibration workflow to identify the optimal pipeline settings. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).  
-3. `gpid validate`: Run validation analyses on samples with known identity to test the accuracy of identification. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).  
+3. `gpid confidence`: Estimate confidence in identifications from samples of known identity, depending on the percentage of genes supporting the top identification. See [3. Confidence estimation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Confidence-estimation).  
 4. `gpid identify`: Run the identification workflow for sample identification using optimal pipeline settings. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).
 
 The Wiki also contains guidance on the [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation) of the identification results and a hands-on [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial) using example data.
@@ -35,7 +35,7 @@ The key steps of the GeneParliamentID pipeline are:
 ## Setup
 
 ### System requirements
-GeneParliamentID is a command-line tool written for Unix-operating systems such as Linux.  
+GeneParliamentID is a command-line tool written for Unix-like operating systems such as Linux. It requires Bash >=4.3, BLAST+ >=2.16.0 and R >=4.3; conda installs these dependencies.  
 
 The computational requirements for running GPID depend on the dataset. As a point of reference, running the tutorial with 1 CPU requires approx. 175 MB memory.
 
@@ -54,12 +54,12 @@ To confirm that the installation has worked and show a help message on how to us
 `gpid`  
 
 ## Quick start
-To give you a first taste of the capabilities of GPID, this is a minimal example for the identification of  that only covers sample identification.  
+To give you a first taste of the capabilities of GPID, this minimal example covers sample identification.  
 For this purpose, we identify a rattan palm of the genus *Calamus* using a small test dataset comprised of 96 genes and 91 reference taxa.  
 
-[Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction), [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration) and [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation) have already been performed. Note that **these steps only need to be conducted once** for a given lineage and set of genes.  
+[Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction), [Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration) and [Confidence estimation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Confidence-estimation) have already been performed. Note that **these steps only need to be conducted once** for a given lineage and set of genes.  
 
-For a full worked example including reference construction to method calibration and validation, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).  
+For a full worked example covering reference construction, method calibration and confidence estimation, see the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).  
 
 
 ### Download data
@@ -72,9 +72,9 @@ Then, extract the files in the folder using:
 The extracted directory contains the following files and folders:  
 - `reference`: folder containing BLAST reference databases for all genes. See [1. Reference construction](https://github.com/BenKuhnhaeuser/GPID/wiki/1.-Reference-construction).
 - `gene_performance.csv`: file listing performance of each gene, i.e. the percentage of samples correctly identified to species, estimated using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
-- `thresholds.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
-- `confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during method validation. See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
-- `species_groups.csv`: optional file specifying for each species a user-defined group of closely related species. See See [3. Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation).
+- `thresholds_filtering.csv`: file with optimal filtering thresholds selected using method calibration. See [2. Method calibration](https://github.com/BenKuhnhaeuser/GPID/wiki/2.-Method-calibration).
+- `confidence_support.csv`: file listing the probability of the top identification being correct, close or wrong depending on the percentage of genes supporting the identification; produced during confidence estimation. See [3. Confidence estimation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Confidence-estimation).
+- `species_groups.csv`: optional file specifying for each species a user-defined group of closely related species. See [3. Confidence estimation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Confidence-estimation).
 - `samples`: folder containing a sub-folder for each sample to be identified. Each sub-folder contains one fasta file per gene for the sample to be identified, and each file contains a single corresponding gene sequence for the sample. See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification).
 
 After downloading and extracting the folder, change into it using:  
@@ -100,12 +100,12 @@ Optionally, manually defined groups of closely related species can be included i
 See [4. Sample identification](https://github.com/BenKuhnhaeuser/GPID/wiki/4.-Sample-identification) for a full list of arguments and detailed instructions on the requirements for each argument.
 
 To identify sample `Calamus_sample_1`, run:  
-`gpid identify -i samples/Calamus_sample_1/ -r reference/ -g gene_performance.csv -t thresholds.csv -c confidence_support.csv -s species_groups.csv`  
+`gpid identify -i samples/Calamus_sample_1/ -r reference/ -g gene_performance.csv -t thresholds_filtering.csv -c confidence_support.csv -s species_groups.csv`  
 
 ### Pipeline outputs
 GPID summarises all individual gene identifications in a Gene Parliament, which represents the percentage of genes supporting all competing identifications.  
 
-The following output files are produced in the directory `identification/Calamus_sample_1`:
+The following output files are produced in the directory `identifications`:
 - Gene Parliament figure with top 10 identifications: `Calamus_sample_1_gpid.pdf`
 - Gene Parliament table with all identifications: `Calamus_sample_1_gpid.csv`
 - Individual BLAST identifications of each gene: `Calamus_sample_1_blast.tsv`
@@ -123,11 +123,11 @@ In this case, a clear majority of genes support the identification as *Calamus m
 #### Gene Parliament table
 To see all identifications that were retrieved, we can have a look at the Gene Parliament table `Calamus_sample_1_gpid.csv`. This file contains all identifications in tabular format, which may be useful for further analysis of the results.  
 
-Importantly, the table contains the results from [Method validation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Method-validation), providing the percentage of validation samples that were correctly, closely (to species group) or wrongly identified at this level of support. In this case, we had decided to divide the validation samples into three bins of `0-33.33%`, `>33.33-66.66%` and `>66.66-100%`. Based on the percentage of genes supporting the identification of `Calamus_sample_1` as *Calamus melanochaetes*, the validation results from the third bin `>66.66-100%` are used. In this case, all validation samples at this level of support were correct identified. The variable `ID_correct_pct` thus contains the value `100`, whereas the variables `ID_close_pct` and `ID_wrong_pct` are `0`.  
+Importantly, the table contains the results from [Confidence estimation](https://github.com/BenKuhnhaeuser/GPID/wiki/3.-Confidence-estimation), providing the percentage of samples that were correctly, closely (to species group) or wrongly identified at this level of support. In this case, we had decided to divide the samples into three bins of `0-33.3%`, `>33.3-66.7%` and `>66.7-100%` (rounded labels). Based on the percentage of genes supporting the identification of `Calamus_sample_1` as *Calamus melanochaetes*, the confidence estimates from the third bin `>66.7-100%` are used. In this case, all samples at this level of support were correctly identified. Both `ID_correct_pct` and `ID_close_pct` are therefore `100`, because correct species identifications also count as correct species-group identifications; `ID_wrong_pct` is `0`.  
 
 | Sample | Rank | Identification | Species_group | Support_pct | Support_count | Parliament_size | Data_checks | ID_correct_pct | ID_close_pct |ID_wrong_pct|  
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | 
-| Calamus_sample_1 | 1 | Calamus_melanochaetes | Melanochaetes_group | 74.19 | 23 | 31 | PASSED | 100 | 0 | 0 |
+| Calamus_sample_1 | 1 | Calamus_melanochaetes | Melanochaetes_group | 74.19 | 23 | 31 | PASSED | 100 | 100 | 0 |
 | Calamus_sample_1 | 2 | Calamus_calicarpus | Melanochaetes_group | 6.45 | 2 |
 | Calamus_sample_1 | 3 | Calamus_ater | Acamptostachys_group | 3.22 | 1 |
 | Calamus_sample_1 | 3 | Calamus_mollispinus | Applanatus_group | 3.22 | 1 |
@@ -142,4 +142,4 @@ Based on these results, we can have high confidence that the sample is [*Calamus
 ## Next steps
 Have a go at identifying the other two samples, `Calamus_sample_2` and `Calamus_sample_3`. To check whether you are interpreting the results correctly, have a look at [Interpretation](https://github.com/BenKuhnhaeuser/GPID/wiki/5.-Interpretation).  
 
-To work through the full GPID workflow including reference construction, method calibration and method validation, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
+To work through the full GPID workflow including reference construction, method calibration and confidence estimation, explore the [Tutorial](https://github.com/BenKuhnhaeuser/GPID/wiki/6.-Tutorial).
